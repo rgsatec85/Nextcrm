@@ -1,0 +1,365 @@
+/**
+ * Cliente para o backend NestJS, usado apenas em código server-side
+ * (route handlers e server components). O token JWT nunca chega ao
+ * JavaScript do browser — fica em um cookie httpOnly (ver as route handlers
+ * em app/api/auth/), o que reduz a superfície de XSS (spec §17).
+ */
+
+const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:3001/api';
+
+export class BackendError extends Error {
+  constructor(
+    public status: number,
+    public body: unknown,
+  ) {
+    super(`Backend respondeu ${status}`);
+  }
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit & { token?: string } = {},
+): Promise<T> {
+  const { token, headers, ...rest } = init;
+
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    ...rest,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    cache: 'no-store',
+  });
+
+  const contentType = res.headers.get('content-type') ?? '';
+  const body = contentType.includes('application/json')
+    ? await res.json()
+    : await res.text();
+
+  if (!res.ok) {
+    throw new BackendError(res.status, body);
+  }
+
+  return body as T;
+}
+
+export interface SignupPayload {
+  companyName: string;
+  cnpj: string;
+  adminName: string;
+  adminEmail: string;
+  adminPassword: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  user: { id: string; name: string; email: string; role: string };
+  company?: { id: string; name: string };
+}
+
+// --- Fase 1 — CRM Comercial -------------------------------------------------
+// Tipos mínimos para o que as páginas server-side realmente leem — não são um
+// espelho 1:1 do schema Prisma (ex.: Decimal chega serializado como string ou
+// number, dependendo do driver, então os campos monetários aceitam ambos).
+
+export interface Customer {
+  id: string;
+  name: string;
+  document: string | null;
+  segment: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  notes: string | null;
+  status: string;
+  ownerId: string | null;
+  createdAt: string;
+}
+
+export interface Contact {
+  id: string;
+  customerId: string;
+  name: string;
+  role: string | null;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  isPrimary: boolean;
+}
+
+export interface Quote {
+  id: string;
+  opportunityId: string;
+  version: number;
+  status: string;
+  totalValue: string | number;
+  items: Array<{ description: string; quantity: number; unitPrice: number }>;
+  createdAt: string;
+}
+
+export interface OpportunityWithQuotes {
+  id: string;
+  customerId: string;
+  title: string;
+  stage: string;
+  value: string | number;
+  expectedCloseDate: string | null;
+  notes: string | null;
+  ownerId: string | null;
+  createdAt: string;
+  quotes: Quote[];
+}
+
+export interface OpportunityWithCustomer {
+  id: string;
+  customerId: string;
+  title: string;
+  stage: string;
+  value: string | number;
+  ownerId: string | null;
+  createdAt: string;
+  customer: { id: string; name: string };
+}
+
+export interface Order {
+  id: string;
+  quoteId: string | null;
+  customerId: string;
+  status: string;
+  totalValue: string | number;
+  createdAt: string;
+}
+
+export interface Activity {
+  id: string;
+  customerId: string | null;
+  opportunityId: string | null;
+  type: string;
+  notes: string | null;
+  scheduledAt: string | null;
+  doneAt: string | null;
+  createdAt: string;
+}
+
+// --- Fase 2 — Módulo Financeiro ---------------------------------------------
+
+export interface Invoice {
+  id: string;
+  customerId: string;
+  orderId: string | null;
+  installmentNumber: number;
+  totalInstallments: number;
+  amount: string | number;
+  paidAmount: string | number;
+  dueDate: string;
+  paidAt: string | null;
+  paymentMethod: string | null;
+  status: string;
+  isOverdue: boolean;
+  customer?: { id: string; name: string };
+}
+
+export interface Contract {
+  id: string;
+  customerId: string;
+  title: string;
+  value: string | number;
+  startDate: string;
+  endDate: string;
+  renewalPeriodMonths: number | null;
+  status: string;
+  daysUntilExpiration: number;
+  expiringSoon: boolean;
+  customer?: { id: string; name: string };
+}
+
+export interface FinanceDashboard {
+  totalReceivable: number;
+  totalReceived: number;
+  totalOverdue: number;
+  overdueCount: number;
+  cashflow: Array<{ month: string; expected: number; received: number }>;
+}
+
+export interface CustomerScore {
+  customerId: string;
+  classification: 'verde' | 'amarelo' | 'vermelho';
+  punctualityRate: number | null;
+  delinquencyRate: number;
+  totalPaid: number;
+  totalInvoicedAmount: number;
+  overdueAmount: number;
+  relationshipDays: number;
+}
+
+export interface CommissionRow {
+  ownerId: string;
+  ownerName: string;
+  totalPaid: number;
+  commissionRate: number;
+  commissionAmount: number;
+}
+
+export interface CustomerDetail extends Customer {
+  contacts: Contact[];
+  opportunities: OpportunityWithQuotes[];
+  orders: Order[];
+  activities: Activity[];
+  invoices: Invoice[];
+  contracts: Contract[];
+}
+
+// --- Fase 3 — Portal do Cliente e Atendimento -------------------------------
+
+export interface TicketComment {
+  id: string;
+  ticketId: string;
+  authorId: string | null;
+  authorType: 'interno' | 'cliente';
+  body: string;
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  customerId: string;
+  subject: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  slaDueAt: string;
+  assignedTo: string | null;
+  createdAt: string;
+  customer?: { id: string; name: string };
+  comments?: TicketComment[];
+}
+
+export interface KnowledgeArticle {
+  id: string;
+  title: string;
+  slug: string;
+  body: string;
+  category: string | null;
+  isPublished: boolean;
+  createdAt: string;
+}
+
+export interface WebhookSubscription {
+  id: string;
+  url: string;
+  events: string[];
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface PortalLogin {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  lastLoginAt?: string | null;
+  createdAt: string;
+}
+
+export interface PortalCustomer {
+  id: string;
+  name: string;
+  document: string | null;
+  segment: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export const backend = {
+  signup: (payload: SignupPayload) =>
+    request<AuthResponse>('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  login: (payload: LoginPayload) =>
+    request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  me: (token: string) => request('/auth/me', { token }),
+
+  myCompany: (token: string) => request('/tenants/me', { token }),
+
+  users: (token: string) => request('/users', { token }),
+
+  // Fase 1 — CRM Comercial. Só leituras: criação/edição acontece client-side
+  // via o proxy autenticado em app/api/crm/[...path], que já injeta o cookie.
+  customers: (token: string) => request<Customer[]>('/customers', { token }),
+
+  customer: (token: string, id: string) =>
+    request<CustomerDetail>(`/customers/${id}`, { token }),
+
+  opportunities: (token: string, customerId?: string) =>
+    request<OpportunityWithCustomer[]>(
+      `/opportunities${customerId ? `?customerId=${customerId}` : ''}`,
+      { token },
+    ),
+
+  // Fase 2 — Módulo Financeiro. dashboard/commissions são restritos por role
+  // no backend (RolesGuard) — as páginas tratam o 403 com uma mensagem
+  // amigável em vez de deixar a exceção estourar (ver BackendError).
+  financeDashboard: (token: string) =>
+    request<FinanceDashboard>('/finance/dashboard', { token }),
+
+  customerScore: (token: string, customerId: string) =>
+    request<CustomerScore>(`/finance/customers/${customerId}/score`, { token }),
+
+  commissions: (token: string) =>
+    request<CommissionRow[]>('/finance/commissions', { token }),
+
+  invoicesOverdue: (token: string) =>
+    request<Invoice[]>('/invoices?overdueOnly=true', { token }),
+
+  contracts: (token: string) => request<Contract[]>('/contracts', { token }),
+
+  // Fase 3 — Atendimento interno (tickets/knowledge/webhooks). Escritas
+  // acontecem client-side via os proxies autenticados em app/api/crm/ e
+  // app/api/portal/, mesmo padrão da Fase 1/2.
+  tickets: (token: string, filters?: { customerId?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.customerId) params.set('customerId', filters.customerId);
+    if (filters?.status) params.set('status', filters.status);
+    const qs = params.toString();
+    return request<Ticket[]>(`/tickets${qs ? `?${qs}` : ''}`, { token });
+  },
+
+  ticket: (token: string, id: string) => request<Ticket>(`/tickets/${id}`, { token }),
+
+  knowledgeArticles: (token: string) => request<KnowledgeArticle[]>('/knowledge', { token }),
+
+  webhookSubscriptions: (token: string) =>
+    request<WebhookSubscription[]>('/webhooks', { token }),
+
+  portalLogins: (token: string, customerId: string) =>
+    request<PortalLogin[]>(`/customers/${customerId}/portal-logins`, { token }),
+
+  // Fase 3 — Portal do Cliente (hard-scoped ao próprio cliente no backend).
+  portalMe: (token: string) => request<PortalCustomer>('/portal/me', { token }),
+
+  portalOrders: (token: string) => request<Order[]>('/portal/orders', { token }),
+
+  portalInvoices: (token: string) => request<Invoice[]>('/portal/invoices', { token }),
+
+  portalContracts: (token: string) => request<Contract[]>('/portal/contracts', { token }),
+
+  portalTickets: (token: string) => request<Ticket[]>('/portal/tickets', { token }),
+
+  portalKnowledge: (token: string) =>
+    request<KnowledgeArticle[]>('/portal/knowledge', { token }),
+};

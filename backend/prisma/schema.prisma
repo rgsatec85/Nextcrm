@@ -1,0 +1,427 @@
+// Este schema espelha manualmente database/migrations/*.sql — ele é usado
+// apenas como query builder (prisma generate). O schema do banco é
+// gerenciado pelas migrations SQL, não por `prisma migrate`. Ver
+// database/README.md para o motivo (RLS, roles de banco, funções auxiliares
+// não são bem representados pelo Prisma Migrate).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id                      String    @id @default(uuid())
+  name                    String
+  cnpj                    String    @unique
+  isActive                Boolean   @default(true) @map("is_active")
+  onboardingCompletedAt   DateTime? @map("onboarding_completed_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @default(now()) @map("updated_at")
+
+  roles         Role[]
+  users         User[]
+  auditLogs     AuditLog[]
+  customers     Customer[]
+  contacts      Contact[]
+  opportunities Opportunity[]
+  quotes        Quote[]
+  orders        Order[]
+  activities    Activity[]
+  invoices      Invoice[]
+  contracts     Contract[]
+  tickets              Ticket[]
+  ticketComments       TicketComment[]
+  knowledgeArticles    KnowledgeArticle[]
+  webhookSubscriptions WebhookSubscription[]
+
+  @@map("companies")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  slug        String
+  permissions Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+  createdBy   String?  @map("created_by")
+  updatedBy   String?  @map("updated_by")
+
+  company Company @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users   User[]
+
+  @@unique([tenantId, slug])
+  @@map("roles")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  roleId       String    @map("role_id")
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @map("updated_at")
+  createdBy    String?   @map("created_by")
+  updatedBy    String?   @map("updated_by")
+
+  // Comissão (Fase 2): percentual aplicado sobre o valor recebido das
+  // faturas de pedidos de clientes que este usuário possui. Ver
+  // FinanceService.commissionsReport.
+  commissionRate      Decimal       @default(0.05) @map("commission_rate") @db.Decimal(5, 4)
+
+  // Fase 3 — Portal do Cliente: vincula um usuário `cliente_portal` a UM
+  // Customer. Nulo para todos os demais perfis. Ver PortalService — o
+  // "hard lock" do portal filtra tudo por este campo, nunca opcionalmente
+  // como o ABAC de vendedor.
+  customerId          String?       @map("customer_id")
+
+  company             Company       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role                Role          @relation(fields: [roleId], references: [id])
+  portalCustomer      Customer?     @relation("CustomerPortalUsers", fields: [customerId], references: [id], onDelete: Cascade)
+  auditLogs           AuditLog[]
+  ownedCustomers      Customer[]    @relation("CustomerOwner")
+  ownedOpportunities  Opportunity[] @relation("OpportunityOwner")
+  assignedTickets     Ticket[]      @relation("TicketAssignee")
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("users")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  userId    String?  @map("user_id")
+  event     String
+  entity    String?
+  entityId  String?  @map("entity_id")
+  ip        String?
+  userAgent String?  @map("user_agent")
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// Fase 1 — CRM Comercial
+// =============================================================================
+
+model Customer {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  ownerId   String?  @map("owner_id")
+  name      String
+  document  String?
+  segment   String?
+  email     String?
+  phone     String?
+  website   String?
+  notes     String?
+  status    String   @default("ativo")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+  createdBy String?  @map("created_by")
+  updatedBy String?  @map("updated_by")
+
+  company       Company       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner         User?         @relation("CustomerOwner", fields: [ownerId], references: [id])
+  contacts      Contact[]
+  opportunities Opportunity[]
+  orders        Order[]
+  activities    Activity[]
+  invoices      Invoice[]
+  contracts     Contract[]
+  // Fase 3: logins de portal vinculados a este cliente (users.customer_id)
+  // e os chamados de atendimento abertos por/para ele.
+  portalUsers   User[]        @relation("CustomerPortalUsers")
+  tickets       Ticket[]
+
+  @@index([tenantId])
+  @@index([ownerId])
+  @@map("customers")
+}
+
+model Contact {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  customerId String   @map("customer_id")
+  name       String
+  role       String?
+  email      String?
+  phone      String?
+  whatsapp   String?
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+  createdBy  String?  @map("created_by")
+  updatedBy  String?  @map("updated_by")
+
+  company  Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("contacts")
+}
+
+model Opportunity {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  customerId        String    @map("customer_id")
+  ownerId           String?   @map("owner_id")
+  title             String
+  stage             String    @default("lead")
+  value             Decimal   @default(0) @db.Decimal(14, 2)
+  expectedCloseDate DateTime? @map("expected_close_date") @db.Date
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @map("updated_at")
+  createdBy         String?   @map("created_by")
+  updatedBy         String?   @map("updated_by")
+
+  company    Company    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  owner      User?      @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  quotes     Quote[]
+  activities Activity[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([ownerId])
+  @@index([stage])
+  @@map("opportunities")
+}
+
+model Quote {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  opportunityId String   @map("opportunity_id")
+  version       Int      @default(1)
+  status        String   @default("rascunho")
+  totalValue    Decimal  @default(0) @map("total_value") @db.Decimal(14, 2)
+  items         Json     @default("[]")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @map("updated_at")
+  createdBy     String?  @map("created_by")
+  updatedBy     String?  @map("updated_by")
+
+  company     Company     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  orders      Order[]
+
+  @@unique([opportunityId, version])
+  @@index([tenantId])
+  @@map("quotes")
+}
+
+model Order {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  quoteId    String?  @map("quote_id")
+  customerId String   @map("customer_id")
+  status     String   @default("confirmado")
+  totalValue Decimal  @default(0) @map("total_value") @db.Decimal(14, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+  createdBy  String?  @map("created_by")
+  updatedBy  String?  @map("updated_by")
+
+  company  Company   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quote    Quote?    @relation(fields: [quoteId], references: [id])
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([quoteId])
+  @@map("orders")
+}
+
+model Activity {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  customerId    String?   @map("customer_id")
+  opportunityId String?   @map("opportunity_id")
+  type          String
+  notes         String?
+  scheduledAt   DateTime? @map("scheduled_at")
+  doneAt        DateTime? @map("done_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @map("updated_at")
+  createdBy     String?   @map("created_by")
+  updatedBy     String?   @map("updated_by")
+
+  company     Company      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([opportunityId])
+  @@map("activities")
+}
+
+// =============================================================================
+// Fase 2 — Módulo Financeiro
+// =============================================================================
+
+model Invoice {
+  id                 String    @id @default(uuid())
+  tenantId           String    @map("tenant_id")
+  customerId         String    @map("customer_id")
+  orderId            String?   @map("order_id")
+  installmentNumber  Int       @default(1) @map("installment_number")
+  totalInstallments  Int       @default(1) @map("total_installments")
+  amount             Decimal   @db.Decimal(14, 2)
+  paidAmount         Decimal   @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  dueDate            DateTime  @map("due_date") @db.Date
+  paidAt             DateTime? @map("paid_at")
+  paymentMethod      String?   @map("payment_method")
+  status             String    @default("aberto")
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @map("updated_at")
+  createdBy          String?   @map("created_by")
+  updatedBy          String?   @map("updated_by")
+
+  company  Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order    Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model Contract {
+  id                   String    @id @default(uuid())
+  tenantId             String    @map("tenant_id")
+  customerId           String    @map("customer_id")
+  title                String
+  value                Decimal   @default(0) @db.Decimal(14, 2)
+  startDate            DateTime  @map("start_date") @db.Date
+  endDate              DateTime  @map("end_date") @db.Date
+  renewalPeriodMonths  Int?      @map("renewal_period_months")
+  status               String    @default("ativo")
+  notes                String?
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @default(now()) @map("updated_at")
+  createdBy            String?   @map("created_by")
+  updatedBy            String?   @map("updated_by")
+
+  company  Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([endDate])
+  @@map("contracts")
+}
+
+// =============================================================================
+// Fase 3 — Portal do Cliente e Atendimento
+// =============================================================================
+
+model Ticket {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  customerId  String    @map("customer_id")
+  subject     String
+  description String?
+  status      String    @default("aberto")
+  priority    String    @default("media")
+  // Calculado na criação a partir da priority (ver TicketsService) — não é
+  // recalculado se a priority mudar depois, o SLA fica fixado na abertura.
+  slaDueAt    DateTime  @map("sla_due_at")
+  assignedTo  String?   @map("assigned_to")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @map("updated_at")
+  createdBy   String?   @map("created_by")
+  updatedBy   String?   @map("updated_by")
+
+  company  Company         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  assignee User?           @relation("TicketAssignee", fields: [assignedTo], references: [id])
+  comments TicketComment[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  ticketId   String   @map("ticket_id")
+  authorId   String?  @map("author_id")
+  // 'interno' | 'cliente' — quem escreveu o comentário (ver TicketsService/PortalService).
+  authorType String   @map("author_type")
+  body       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket  Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([ticketId])
+  @@map("ticket_comments")
+}
+
+model KnowledgeArticle {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  title       String
+  slug        String
+  body        String
+  category    String?
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+  createdBy   String?  @map("created_by")
+  updatedBy   String?  @map("updated_by")
+
+  company Company @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("knowledge_articles")
+}
+
+model WebhookSubscription {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  url       String
+  // Gerado pelo backend na criação; nunca devolvido em texto puro depois
+  // (ver WebhooksService). Usado para assinar (HMAC-SHA256) cada entrega.
+  secret    String
+  events    String[]
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+  createdBy String?  @map("created_by")
+  updatedBy String?  @map("updated_by")
+
+  company Company @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("webhook_subscriptions")
+}
