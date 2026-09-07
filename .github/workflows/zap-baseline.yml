@@ -1,0 +1,51 @@
+name: DAST — OWASP ZAP baseline scan (manual)
+
+# Disparo manual, de propósito — este projeto não tem um ambiente de
+# staging efêmero (nenhuma preview deployada automaticamente por PR), então
+# não existe uma URL "descartável" segura para apontar um scanner ativo
+# automaticamente em todo push. O ZAP baseline scan envia tráfego HTTP real
+# contra a URL informada (passivo + alguns testes ativos leves) — rodar
+# isso contra produção sem saber é o tipo de coisa que gera alerta de
+# segurança para o próprio time.
+#
+# Use manualmente (aba Actions → este workflow → "Run workflow") contra uma
+# URL de review/staging que você controla, nunca contra produção sem
+# planejar a janela com o time. Ver docs/deployment.md > "DevSecOps" para o
+# checklist de quando/como rodar isso.
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "URL do backend a escanear (ex.: https://crm-backend-staging.onrender.com/api) — NUNCA a URL de produção sem avisar o time antes."
+        required: true
+        type: string
+
+jobs:
+  zap-baseline:
+    name: ZAP baseline scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirmar que a URL não parece ser o domínio de produção
+        run: |
+          if [[ "${{ inputs.target_url }}" == *"crm-backend.onrender.com"* ]]; then
+            echo "::warning::A URL informada parece ser a de produção documentada em docs/deployment.md. Confirme com o time antes de rodar um scan ativo contra produção."
+          fi
+
+      - name: OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ inputs.target_url }}
+          # Baseline = só ataques passivos + um subconjunto leve de ativos,
+          # pensado para rodar sem autenticação prévia contra uma API REST.
+          # Não bloqueia o workflow por padrão — os alertas viram o
+          # artefato de relatório abaixo, para revisão manual.
+          cmd_options: "-a"
+          fail_action: false
+
+      - name: Publicar relatório como artefato
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-baseline-report
+          path: report_html.html
+          if-no-files-found: ignore

@@ -1,0 +1,31 @@
+# Promtail — lê os logs dos containers Docker do host (via docker.sock) e
+# empurra para o Loki. É o que faz o Loki deste stack ter dado de verdade
+# sem precisar mudar nenhuma linha do backend (nenhum "Loki exporter" no
+# código da aplicação — o backend só escreve no stdout normalmente, como
+# sempre fez).
+#
+# Nota de portabilidade: o caminho do socket do Docker varia por SO/setup
+# (Linux costuma ser /var/run/docker.sock; Docker Desktop no Mac/Windows
+# pode exigir habilitar "Allow the default Docker socket to be used" nas
+# configurações, ou trocar o volume abaixo pelo socket do contexto ativo).
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: "container"
+      - source_labels: ["__meta_docker_container_log_stream"]
+        target_label: "stream"

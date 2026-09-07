@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Post,
@@ -73,7 +74,18 @@ export class PortalController {
     return this.portalService.addComment(user, id, dto);
   }
 
+  // Cache headers (Fase 5 — Hardening): base de conhecimento publicada muda
+  // raramente (autoria é admin/gestor, não em tempo real) e a resposta já
+  // passou pelas 3 camadas de isolamento de sempre (JWT → filtro por
+  // customerId no PortalService → RLS) antes de chegar aqui — o cache só
+  // guarda a resposta já filtrada. `private` (não `public`/`s-maxage`) de
+  // propósito: só o cache do navegador do próprio cliente pode reter isso,
+  // nunca um cache compartilhado/CDN na frente da API, que teria que usar
+  // o token/tenant como parte da chave de cache para não vazar entre
+  // clientes — como esse projeto não configura isso, `private` é a escolha
+  // segura (ver docs/scaling-checklist.md).
   @Get('knowledge')
+  @Header('Cache-Control', 'private, max-age=60')
   knowledge(@CurrentUser() user: AuthenticatedUser) {
     return this.portalService.knowledge(user);
   }

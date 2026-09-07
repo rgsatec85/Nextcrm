@@ -149,17 +149,47 @@ retry (decisão #9 abaixo) — ver `docs/fase4-ia-corporativa.md` para o
 detalhamento completo, incluindo por que o Score IA continua determinístico
 em vez de "aprendizado de máquina de verdade".
 
+### 11. Observabilidade condicional e rate limiting com fallback (Fase 5)
+
+Duas peças novas da Fase 5 seguem o mesmo princípio de "nunca quebrar
+produção por causa de infraestrutura opcional ausente" já usado no
+`OllamaAiProvider` (Fase 4) e no `WebhooksService.dispatch()` (Fase 3):
+
+- **OpenTelemetry** (`backend/src/observability/tracing.ts`) só inicia se
+  `OTEL_EXPORTER_OTLP_ENDPOINT` estiver definido — ausente, a SDK nem é
+  instanciada (zero custo, zero risco). Precisa ser importada como a
+  primeira linha de `main.ts`, antes até de `@nestjs/core`, porque a
+  auto-instrumentação do Node SDK depende de fazer o monkey-patch de
+  `pg`/`http` antes desses módulos serem carregados por qualquer outro
+  import.
+- **Rate limiting com Redis** (`RedisThrottlerStorageService`) usa Redis
+  quando `REDIS_URL` está configurado e o Redis responde; cai para o
+  armazenamento em memória padrão do `@nestjs/throttler` nos outros dois
+  casos (não configurado, ou configurado mas fora do ar em runtime) — sem
+  jamais propagar esse erro para a requisição do usuário. Ver
+  `docs/fase5-hardening-observabilidade.md` para o detalhamento completo
+  (inclusive o script Lua usado para a operação atômica no Redis).
+
 ## Pontos em aberto (herdados do roadmap, específicos de arquitetura)
 
-- **Requisitos não funcionais (spec §25)**: sem metas de SLA/RPO/RTO
-  definidas. Precisa ser fechado antes da Fase 5 (Hardening/Escala).
+- **Requisitos não funcionais (spec §25)**: ✅ fechado nesta fase — metas
+  propostas (disponibilidade, RPO, RTO, latência, throughput) por tier de
+  capacidade em `docs/nfr-slo.md`. Continuam sendo *propostas para
+  validação*, não medições reais — este projeto nunca rodou com tráfego de
+  produção.
 - **Multi-tenancy de email**: ver decisão #4 acima — validar com o time se o
   trade-off é aceitável.
 - **Rotação de JWT / refresh tokens**: a Fase 0 implementa um único
   `accessToken` de vida longa (8h). Um fluxo de refresh token (ou sessões
-  revogáveis via Redis) é recomendado antes de produção real com muitos
-  usuários simultâneos.
-- **Rate limiting por rota**: hoje é global (100 req/min por IP via
-  `@nestjs/throttler`). Rotas sensíveis (`/auth/login`, `/auth/signup`)
-  merecem um limite mais agressivo e específico — ajuste simples com
-  `@Throttle()` quando o tráfego real justificar.
+  revogáveis via Redis — agora que a Fase 5 já traz um `RedisService`
+  opcional reutilizável para isso) é recomendado antes de produção real com
+  muitos usuários simultâneos.
+- **Rate limiting por rota**: hoje é global (100 req/min por IP,
+  armazenamento em Redis quando disponível — Fase 5 — ou em memória por
+  instância). Rotas sensíveis (`/auth/login`, `/auth/signup`) ainda merecem
+  um limite mais agressivo e específico — ajuste simples com `@Throttle()`
+  quando o tráfego real justificar.
+- **Observabilidade sem destino real em produção**: o OpenTelemetry desta
+  fase está pronto no código mas inativo até alguém configurar
+  `OTEL_EXPORTER_OTLP_ENDPOINT` (local ou Grafana Cloud) — ver
+  `docs/observability.md`.

@@ -1,0 +1,33 @@
+# Config mínima do Loki (modo standalone, filesystem local) para este stack
+# de desenvolvimento. Não é a configuração recomendada para produção
+# (usaria object storage — S3/GCS) — para produção, ver a opção "Grafana
+# Cloud" em docs/observability.md, que evita ter que operar Loki/Prometheus
+# você mesmo.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  allow_structured_metadata: false

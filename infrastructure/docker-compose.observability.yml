@@ -1,0 +1,104 @@
+version: "3.9"
+
+# Stack de observabilidade LOCAL/self-hosted (Fase 5 — Hardening). Sobe à
+# parte do `docker-compose.yml` principal (Postgres + Redis de
+# desenvolvimento) porque é opcional: o backend funciona perfeitamente sem
+# isso, exatamente como no Render hoje. Isso existe para você EXPERIMENTAR
+# observabilidade localmente antes de decidir se quer pagar por um serviço
+# gerenciado (Grafana Cloud, recomendado para produção — ver
+# docs/observability.md, já que o Render não roda um segundo serviço
+# stateful ao lado da API de graça).
+#
+# Uso:
+#   docker compose -f infrastructure/docker-compose.observability.yml up -d
+#
+# Depois, no backend (.env):
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+#
+# Grafana: http://localhost:3300 (login padrão admin/admin, troca no
+# primeiro acesso) — Prometheus e Loki já vêm provisionados como
+# datasource.
+#
+# Honestidade sobre o que este stack cobre de verdade:
+#   - Traces do backend (spans automáticos de HTTP/pg via
+#     @opentelemetry/auto-instrumentations-node + o span manual de
+#     `PrismaService.runWithTenant`) chegam no OTel Collector e aparecem no
+#     log do container `otel-collector` (exporter "debug") — não há um
+#     backend de tracing tipo Tempo/Jaeger neste stack mínimo, então não dá
+#     para navegar traces visualmente no Grafana ainda; é o próximo passo
+#     natural se isso vier a ser necessário.
+#   - Métricas: só as que o próprio Collector deriva do que recebe
+#     (contagem de spans etc.), raspadas pelo Prometheus. Não há métricas
+#     de negócio/aplicação (latência por rota, taxa de erro por endpoint)
+#     ainda — a Fase 5 instrumentou traces, não métricas customizadas (ver
+#     docs/observability.md, "o que falta").
+#   - Logs: o Promtail lê os logs de TODOS os containers Docker do host
+#     (via docker.sock) e empurra para o Loki — isso inclui o backend se
+#     ele estiver rodando como container Docker (não cobre `npm run
+#     start:dev` rodando direto no host, fora de container).
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    container_name: crm-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # métricas expostas para o Prometheus raspar
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: crm-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - crm_prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: crm-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - crm_loki_data:/loki
+    ports:
+      - "3100:3100"
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    container_name: crm-promtail
+    restart: unless-stopped
+    command: ["-config.file=/etc/promtail/promtail-config.yaml"]
+    volumes:
+      - ./observability/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: crm-grafana
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - crm_grafana_data:/var/lib/grafana
+    ports:
+      - "3300:3000"
+    depends_on:
+      - prometheus
+      - loki
+
+volumes:
+  crm_prometheus_data:
+  crm_loki_data:
+  crm_grafana_data:

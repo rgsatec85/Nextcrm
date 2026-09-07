@@ -1,0 +1,17 @@
+# Provisionamento automático de datasources do Grafana (lido na subida do
+# container — ver volume no docker-compose.observability.yml). Assim
+# "docker compose up" já deixa Prometheus e Loki prontos para usar em
+# Explore/Dashboards, sem passo manual de "Add data source".
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100

@@ -123,6 +123,29 @@ A partir da Fase 4 (Inteligência Artificial Corporativa), também tem:
   (default `llama3`) — só relevantes quando `AI_PROVIDER=ollama`. Ver
   `docs/fase4-ia-corporativa.md`.
 
+A partir da Fase 5 (Hardening, Escala e Observabilidade), também tem:
+
+- `GET /api/health/ready` — health check de prontidão (banco + Redis se
+  configurado), separado do `GET /api/health` de sempre (liveness, usado
+  pelo Render). Ver `docs/fase5-hardening-observabilidade.md`.
+- Rate limiting passa a usar Redis quando `REDIS_URL` está configurado
+  (opcional — sem ele, continua em memória como sempre foi).
+- Novas variáveis de ambiente do backend, todas opcionais: `REDIS_URL` (já
+  existia no `.env.example` desde a Fase 0, mas só passou a ser usada
+  nesta fase), `OTEL_EXPORTER_OTLP_ENDPOINT` e `OTEL_SERVICE_NAME`
+  (observabilidade — sem a primeira definida, o OpenTelemetry SDK não
+  inicia). Ver `docs/observability.md`.
+- Stack de observabilidade local opcional:
+  ```bash
+  docker compose -f infrastructure/docker-compose.observability.yml up -d
+  ```
+  Sobe OTel Collector + Prometheus + Loki + Promtail + Grafana
+  (`http://localhost:3300`). Ver `docs/observability.md`.
+- Novos docs: `docs/nfr-slo.md` (metas de SLA/RPO/RTO/latência propostas
+  por tier de capacidade), `docs/scaling-checklist.md` (checklist de
+  dashboard para escalar Supabase/Render/Vercel) e
+  `docs/fase5-hardening-observabilidade.md` (visão geral da fase).
+
 ## 4. Rodando testes e verificações
 
 ```bash
@@ -188,3 +211,21 @@ real e funcional, mas não exercitado pelos testes automatizados por falta
 de rede alcançando um servidor Ollama neste sandbox (o `DeterministicAiProvider`,
 usado por padrão e por todos os testes, não depende de rede nenhuma).
 Detalhes em `docs/fase4-ia-corporativa.md`.
+
+A Fase 5 (Hardening, Escala e Observabilidade) seguiu o mesmo processo para
+a parte de código (`tsc`/`eslint`/`jest`/`build` 100% no backend, 13 testes
+novos — `RedisThrottlerStorageService`, `RedisService`, `HealthController`
+— nenhuma tabela nova, nenhuma mudança no frontend). A parte de
+infraestrutura/observabilidade teve uma limitação adicional deste sandbox,
+diferente das anteriores: o Docker Engine está disponível aqui (diferente
+do "sem acesso a `binaries.prisma.sh`" citado acima), e
+`infrastructure/docker-compose.observability.yml` foi validado
+sintaticamente (`docker compose config`, `yaml.safe_load` em cada arquivo)
+sem erros — mas o `docker pull` das imagens (Prometheus, Grafana, Loki,
+OTel Collector, Promtail) é bloqueado pela política de rede de saída deste
+ambiente (HTTP 403 em qualquer registry testado, Docker Hub e ghcr.io
+inclusive), então o stack nunca chegou a rodar de ponta a ponta aqui. Em
+qualquer máquina/CI com acesso normal a registries de containers, isso
+deve funcionar sem nenhuma ação extra — mas vale confirmar na primeira vez.
+Detalhes em `docs/fase5-hardening-observabilidade.md` e
+`docs/observability.md`.

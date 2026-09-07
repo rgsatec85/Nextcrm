@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
+import { RedisService } from './redis/redis.service';
+import { RedisThrottlerStorageService } from './common/throttler/redis-throttler-storage.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
@@ -25,14 +28,31 @@ import { AiModule } from './modules/ai/ai.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([
-      {
-        // Rate limiting básico (spec seção 17). Ajuste por rota conforme
-        // necessário com o decorator @Throttle().
-        ttl: 60_000,
-        limit: 100,
-      },
-    ]),
+    RedisModule,
+    ThrottlerModule.forRootAsync({
+      imports: [RedisModule],
+      inject: [RedisService],
+      useFactory: (redisService: RedisService) => ({
+        throttlers: [
+          {
+            // Rate limiting básico (spec seção 17). Ajuste por rota
+            // conforme necessário com o decorator @Throttle().
+            ttl: 60_000,
+            limit: 100,
+          },
+        ],
+        // Fase 5: armazenamento em Redis (com fallback automático em
+        // memória quando REDIS_URL não está configurado ou o Redis está
+        // fora do ar) — ver `RedisThrottlerStorageService`. Sem isso, cada
+        // instância do backend no Render conta hits separadamente mesmo
+        // com Redis disponível, o que já era uma limitação conhecida desta
+        // fundação (ver docs/architecture.md, "Rate limiting por rota").
+        // Construído diretamente (não via DI) porque o próprio
+        // ThrottlerModule ainda não existe neste ponto do bootstrap — só
+        // RedisService, que ele injeta, precisa vir do container.
+        storage: new RedisThrottlerStorageService(redisService),
+      }),
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,

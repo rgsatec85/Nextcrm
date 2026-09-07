@@ -96,10 +96,9 @@ jobs:
   security:
     name: Security scan (SAST básico)
     runs-on: ubuntu-latest
-    # Não bloqueia o pipeline na Fase 0 — serve para visibilidade contínua.
-    # Conforme o roadmap (Fase 5 — Hardening), isso evolui para gate
-    # obrigatório com SonarQube + OWASP ZAP (DAST) contra um ambiente de
-    # staging.
+    # Não bloqueia o pipeline — serve para visibilidade contínua. Ver
+    # docs/deployment.md > "DevSecOps" (Fase 5) para o porquê de cada
+    # ferramenta desta lista (e a que ficou de fora, e por quê).
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -118,3 +117,35 @@ jobs:
       - name: npm audit (frontend)
         working-directory: frontend
         run: npm audit --audit-level=high || true
+
+  codeql:
+    name: CodeQL (SAST — análise estática do código)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    # Mesma filosofia do job "security" acima: visibilidade contínua, não
+    # bloqueia o merge nesta fase. CodeQL foi escolhido em vez de SonarQube
+    # para o gate de SAST real do pipeline porque é gratuito para
+    # repositórios públicos/GitHub e não depende de nenhuma conta externa
+    # nem secret — roda com o próprio GITHUB_TOKEN. Ver docs/deployment.md
+    # para a decisão explícita de NÃO wirear um step de SonarQube que
+    # silenciosamente não faria nada sem um token pago/gratuito configurado
+    # pelo usuário.
+    continue-on-error: true
+    strategy:
+      matrix:
+        language: ["javascript-typescript"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Analisar
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

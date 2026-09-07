@@ -1,0 +1,41 @@
+# OTel Collector — recebe o que o backend exporta quando
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 (ou http://otel-collector:4318
+# de dentro da rede docker-compose) e expõe métricas derivadas para o
+# Prometheus raspar. Ver docs/observability.md.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  # Escreve spans/métricas recebidos no log do próprio container — forma
+  # mais simples de confirmar "o backend está mesmo enviando dados" sem
+  # precisar de um backend de tracing (Tempo/Jaeger) neste stack mínimo.
+  debug:
+    verbosity: basic
+
+  # Expõe :8889/metrics (formato Prometheus) com as métricas que o
+  # Collector calcula sobre o que recebe (contagem de spans, etc.) — é isso
+  # que o Prometheus deste compose raspa. Um pipeline de métricas de
+  # aplicação de verdade (latência de rota, taxa de erro) exigiria também
+  # instrumentar métricas no backend (hoje só instrumentamos traces — ver
+  # docs/observability.md, "o que falta para métricas de aplicação").
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, prometheus]

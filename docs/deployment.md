@@ -64,7 +64,22 @@ git push -u origin main
      provisionar um servidor Ollama real e alcançável a partir do Render, e
      nesse caso configure também `OLLAMA_BASE_URL` (URL desse servidor) e
      `OLLAMA_MODEL` (nome do modelo carregado nele).
-4. Health check path: `/api/health`.
+   - `REDIS_URL` (Fase 5, opcional) — deixe **sem definir** até provisionar
+     um Redis de verdade (ex.: Upstash, via marketplace de add-ons do
+     Render ou direto na Upstash). Sem ele, o rate limiting cai
+     automaticamente para memória (por instância) e `GET /api/health/ready`
+     reporta Redis como `not_configured`, não como falha — nada quebra.
+     Ver `docs/scaling-checklist.md` (quando provisionar) e
+     `backend/src/redis/redis.service.ts` (como o fallback funciona).
+   - `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_SERVICE_NAME` (Fase 5, opcional)
+     — deixe **sem definir** até ter um collector real para apontar (local
+     via `infrastructure/docker-compose.observability.yml`, ou um provedor
+     gerenciado como Grafana Cloud). Sem isso, o OpenTelemetry SDK
+     simplesmente não inicia — ver `docs/observability.md`.
+4. Health check path: `/api/health` (liveness — **não** `/api/health/ready`,
+   que checa banco/Redis e reiniciaria um processo saudável por causa de
+   uma instabilidade externa; ver o doc-comment em
+   `backend/src/health/health.controller.ts`).
 5. Depois de criar o serviço, copie o **Deploy Hook** (Settings → Deploy
    Hook) e salve como secret `RENDER_DEPLOY_HOOK_URL` no GitHub
    (repositório → Settings → Secrets and variables → Actions).
@@ -86,8 +101,31 @@ git push -u origin main
 
 - `.github/workflows/ci.yml` roda em todo push/PR para `main`/`develop`:
   lint + testes + build do backend (com Postgres efêmero do próprio job
-  aplicando as migrations) e lint + build do frontend, além de um scan
-  básico de segurança (Trivy + `npm audit`, não-bloqueante nesta fase).
+  aplicando as migrations) e lint + build do frontend, mais dois jobs de
+  segurança não-bloqueantes (`continue-on-error: true` — visibilidade
+  contínua, não gate ainda):
+  - **`security`**: Trivy (scan de filesystem — dependências vulneráveis,
+    segredos commitados) + `npm audit` (backend e frontend).
+  - **`codeql`** (Fase 5): SAST real via GitHub CodeQL
+    (`github/codeql-action`), analisando o código TypeScript do monorepo.
+    Escolhido em vez de SonarQube para o SAST desta fase porque é **grátis
+    e não exige nenhuma conta/secret externo** — roda com o `GITHUB_TOKEN`
+    padrão do próprio Actions. SonarQube/SonarCloud ficou **deliberadamente
+    fora** do pipeline: exigiria uma conta (paga ou o tier gratuito do
+    SonarCloud, que também exige cadastro) e um token configurado pelo
+    usuário — em vez de simular isso com um step que "passaria" sem checar
+    nada de verdade, a decisão foi documentar como passo manual opcional:
+    se o time quiser SonarCloud, crie a conta, gere o token, adicione como
+    secret `SONAR_TOKEN` e um step com `SonarSource/sonarcloud-github-action`
+    — não incluído aqui por não haver como testá-lo neste sandbox nem
+    fingir que funciona sem a conta real.
+- `.github/workflows/zap-baseline.yml` (Fase 5): scan DAST com **OWASP
+  ZAP** (baseline scan), disparado **manualmente** (`workflow_dispatch`,
+  aba Actions → "Run workflow"), pedindo a URL alvo como input. Não roda
+  automaticamente porque este projeto não tem um ambiente de staging
+  efêmero (nenhuma preview deployada por PR) — rodar um scanner ativo
+  contra produção sem que o time saiba não é uma boa prática. Use isso
+  manualmente contra uma URL de review/staging quando quiser um scan.
 - `.github/workflows/deploy.yml` dispara automaticamente quando o CI termina
   com sucesso na `main`: chama o deploy hook do Render e publica o frontend
   na Vercel via CLI. Sem os secrets configurados, os jobs de deploy
@@ -114,3 +152,21 @@ ou GitHub Actions com `schedule`) chamando um endpoint interno.
       verificação em `docs/security-multitenancy.md`).
 - [ ] Habilitar HTTPS obrigatório no Render e na Vercel (ambos fazem isso
       por padrão, mas confirme dominios customizados).
+
+## 7. Hardening, escala e observabilidade (Fase 5)
+
+Detalhes completos em `docs/fase5-hardening-observabilidade.md`. Referência
+rápida:
+
+- **Metas de NFR/SLA/RPO/RTO** propostas (não ainda medidas em produção):
+  `docs/nfr-slo.md`.
+- **Escalar Supabase/Render/Vercel por tier de capacidade**: checklist
+  passo a passo em `docs/scaling-checklist.md` — nada disso está ativado
+  hoje, é o guia para quando o tráfego justificar.
+- **Observabilidade (OpenTelemetry)**: `docs/observability.md` — como
+  apontar o backend para o stack local
+  (`infrastructure/docker-compose.observability.yml`) ou para um provedor
+  gerenciado. Inativo em produção até `OTEL_EXPORTER_OTLP_ENDPOINT` ser
+  configurado.
+- **Rate limiting com Redis**: opcional via `REDIS_URL`, com fallback
+  automático em memória — nunca quebra o backend na ausência do Redis.

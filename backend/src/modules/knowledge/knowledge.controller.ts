@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -38,7 +39,13 @@ export class KnowledgeController {
     return this.knowledgeService.findAll(user);
   }
 
+  // Cache headers (Fase 5): leitura de UM artigo por id muda pouco no
+  // curto prazo mesmo no painel interno; `private` + janela curta (30s)
+  // para não atrasar demais a percepção de uma edição recente por quem
+  // está editando. `findAll` (lista, inclui rascunhos) e os endpoints de
+  // escrita abaixo NÃO recebem cache — são a própria superfície de edição.
   @Get(':id')
+  @Header('Cache-Control', 'private, max-age=30')
   findOne(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,

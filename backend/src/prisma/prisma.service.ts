@@ -1,5 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
+import { SpanStatusCode } from '@opentelemetry/api';
+import { tracer } from '../observability/tracer';
 
 const TENANT_ID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,9 +40,30 @@ export class PrismaService
       throw new Error(`tenantId inválido: ${tenantId}`);
     }
 
-    return this.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
-      return fn(tx);
+    // Span manual (Fase 5 — Observabilidade). `tracer` vem da API do OTel
+    // diretamente (não de `sdk-node`) — quando `OTEL_EXPORTER_OTLP_ENDPOINT`
+    // não está configurado isso é um tracer no-op global (custo
+    // desprezível), então este wrapper é seguro de existir sempre, sem
+    // nenhum `if` condicional aqui. Só carrega `tenant_id` como atributo —
+    // nunca dados de negócio (PII), mesmo nível de exposição que os logs
+    // de auditoria já existentes (AuditLogInterceptor).
+    return tracer.startActiveSpan('prisma.runWithTenant', async (span) => {
+      span.setAttribute('tenant_id', tenantId);
+      try {
+        const result = await this.$transaction(
+          async (tx: Prisma.TransactionClient) => {
+            await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+            return fn(tx);
+          },
+        );
+        return result;
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR });
+        throw err;
+      } finally {
+        span.end();
+      }
     });
   }
 }
