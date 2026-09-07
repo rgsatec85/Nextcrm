@@ -1,10 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
-  Patch,
   Post,
   Query,
   UseGuards,
@@ -18,48 +18,39 @@ import {
   CurrentUser,
   AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator';
-import { ActivitiesService } from './activities.service';
-import { CreateActivityDto } from './dto/create-activity.dto';
+import { AgendaBlocksService } from './agenda-blocks.service';
+import { CreateAgendaBlockDto } from './dto/create-agenda-block.dto';
 
-@Controller('activities')
+@Controller('agenda-blocks')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'gestor', 'vendedor', 'financeiro')
 @UseInterceptors(AuditLogInterceptor)
-export class ActivitiesController {
-  constructor(private readonly activitiesService: ActivitiesService) {}
+export class AgendaBlocksController {
+  constructor(private readonly agendaBlocksService: AgendaBlocksService) {}
 
   @Post()
   create(
     @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CreateActivityDto,
+    @Body() dto: CreateAgendaBlockDto,
   ) {
-    return this.activitiesService.create(user, dto);
+    return this.agendaBlocksService.create(user, dto);
   }
 
   @Get()
   findAll(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('customerId') customerId?: string,
-    @Query('opportunityId') opportunityId?: string,
-    // Fase 8 (RF016) — usados pela tela `/dashboard/agenda`.
-    @Query('userId') userId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('userId') userId?: string,
   ) {
-    return this.activitiesService.findAll(user, {
-      customerId,
-      opportunityId,
-      userId,
-      from,
-      to,
-    });
+    return this.agendaBlocksService.findAll(user, { from, to, userId });
   }
 
-  @Patch(':id/complete')
-  complete(
+  @Delete(':id')
+  remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.activitiesService.complete(user, id);
+    return this.agendaBlocksService.remove(user, id);
   }
 }

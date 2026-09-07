@@ -168,7 +168,21 @@ export interface Activity {
   type: string;
   notes: string | null;
   scheduledAt: string | null;
+  // Fase 8 (RF016) — fim do compromisso; só presente junto de scheduledAt
+  // quando a atividade é um "slot" de calendário (sujeito a conflito).
+  endAt: string | null;
   doneAt: string | null;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+// Fase 8 (RF016) — bloqueio pessoal de período na agenda de um usuário.
+export interface AgendaBlock {
+  id: string;
+  userId: string;
+  startsAt: string;
+  endsAt: string;
+  reason: string | null;
   createdAt: string;
 }
 
@@ -532,4 +546,36 @@ export const backend = {
   // `/api/crm/orders/...` e `/api/crm/quotes/:id/convert-to-order`, mesmo
   // padrão do resto do CRM.
   orders: (token: string) => request<OrderWithDetails[]>('/orders', { token }),
+
+  // Fase 8 — Atividades & Calendário (RF016). Escritas (criar atividade,
+  // concluir, bloquear/desbloquear período) acontecem client-side via os
+  // proxies `/api/crm/activities/...` e `/api/crm/agenda-blocks/...`, mesmo
+  // padrão do resto do CRM. `from`/`to`/`userId` alimentam a tela
+  // `/dashboard/agenda` — sem eles, mantém o uso já existente no Cliente
+  // 360° (todas as atividades daquele cliente).
+  activities: (
+    token: string,
+    filters?: { from?: string; to?: string; userId?: string },
+  ) => {
+    const params = new URLSearchParams();
+    if (filters?.from) params.set('from', filters.from);
+    if (filters?.to) params.set('to', filters.to);
+    if (filters?.userId) params.set('userId', filters.userId);
+    const qs = params.toString();
+    return request<Activity[]>(`/activities${qs ? `?${qs}` : ''}`, { token });
+  },
+
+  agendaBlocks: (
+    token: string,
+    filters?: { from?: string; to?: string; userId?: string },
+  ) => {
+    const params = new URLSearchParams();
+    if (filters?.from) params.set('from', filters.from);
+    if (filters?.to) params.set('to', filters.to);
+    if (filters?.userId) params.set('userId', filters.userId);
+    const qs = params.toString();
+    return request<AgendaBlock[]>(`/agenda-blocks${qs ? `?${qs}` : ''}`, {
+      token,
+    });
+  },
 };

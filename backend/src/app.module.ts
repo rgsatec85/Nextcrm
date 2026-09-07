@@ -17,6 +17,7 @@ import { QuotesModule } from './modules/quotes/quotes.module';
 import { ProposalTemplatesModule } from './modules/proposal-templates/proposal-templates.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ActivitiesModule } from './modules/activities/activities.module';
+import { AgendaBlocksModule } from './modules/agenda-blocks/agenda-blocks.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
 import { FinanceModule } from './modules/finance/finance.module';
@@ -66,6 +67,7 @@ import { AiModule } from './modules/ai/ai.module';
     ProposalTemplatesModule,
     OrdersModule,
     ActivitiesModule,
+    AgendaBlocksModule,
     InvoicesModule,
     ContractsModule,
     FinanceModule,

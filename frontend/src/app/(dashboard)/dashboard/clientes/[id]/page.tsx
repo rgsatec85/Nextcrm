@@ -28,6 +28,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { AttainmentBar } from '@/components/ui/progress-bar';
 import { ScoreGauge } from '@/components/charts/score-gauge';
 import {
+  ACTIVITY_TYPE_LABELS,
   COMPANY_SIZE_LABELS,
   INVOICE_STATUS_TONE,
   LEAD_SOURCE_LABELS,
@@ -369,13 +370,19 @@ export default async function ClienteDetailPage({
                         </span>
                         <span className="flex items-center gap-2">
                           <QuoteActions quoteId={q.id} status={q.status} isWinner={q.isWinner} />
+                          {/* Destaque proposital (variant="primary" em vez de
+                              "secondary"): aprovar uma proposta não gera mais
+                              o Pedido sozinho desde a Fase 7 — sem esse
+                              realce, o próximo passo passa despercebido e
+                              parece que "a proposta aprovada não virou
+                              pedido". */}
                           {q.status === 'aprovada' && q.orders.length === 0 && (
                             <CreateDrawer
                               triggerLabel="Converter em Pedido"
                               title="Converter proposta em pedido"
                               description="Itens, prazo de entrega e condição de pagamento podem ser revisados antes de confirmar."
                               size="sm"
-                              variant="secondary"
+                              variant="primary"
                             >
                               <ConvertQuoteToOrderForm quoteId={q.id} items={q.items} />
                             </CreateDrawer>
@@ -524,9 +531,14 @@ export default async function ClienteDetailPage({
           icon={<CalendarClock className="h-4 w-4" />}
           title={`Agenda (${customer.activities.length})`}
           action={
-            <CreateDrawer triggerLabel="Nova atividade" size="sm" variant="secondary">
-              <NewActivityForm customerId={customer.id} />
-            </CreateDrawer>
+            <span className="flex items-center gap-3">
+              <Link href="/dashboard/agenda" className="text-sm text-brand-600 hover:underline">
+                Ver calendário
+              </Link>
+              <CreateDrawer triggerLabel="Nova atividade" size="sm" variant="secondary">
+                <NewActivityForm customerId={customer.id} />
+              </CreateDrawer>
+            </span>
           }
         />
         {customer.activities.length === 0 ? (
@@ -536,7 +548,9 @@ export default async function ClienteDetailPage({
             {customer.activities.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
                 <div>
-                  <span className="font-medium text-slate-900 dark:text-slate-100">{a.type}</span>
+                  <span className="font-medium text-slate-900 dark:text-slate-100">
+                    {ACTIVITY_TYPE_LABELS[a.type] ?? a.type}
+                  </span>
                   {a.notes && <span className="text-slate-500 dark:text-slate-400"> · {a.notes}</span>}
                   {a.scheduledAt && (
                     <span className="text-slate-400">

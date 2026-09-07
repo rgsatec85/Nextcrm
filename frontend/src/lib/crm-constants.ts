@@ -51,7 +51,17 @@ export const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   ligacao: 'Ligação',
   follow_up: 'Follow-up',
   nota: 'Nota',
+  // Fase 8 (RF016) — tipos de propósito geral, sem cliente/oportunidade
+  // obrigatórios (espelha CRM_LINKED_ACTIVITY_TYPES em
+  // backend/src/modules/activities/dto/create-activity.dto.ts).
+  tarefa: 'Tarefa',
+  evento: 'Evento',
 };
+
+// Tipos que exigem cliente e/ou oportunidade (espelha
+// CRM_LINKED_ACTIVITY_TYPES do backend) — usado pelo formulário de nova
+// atividade para decidir se mostra o seletor de cliente/oportunidade.
+export const CRM_LINKED_ACTIVITY_TYPES = ['reuniao', 'ligacao', 'follow_up', 'nota'];
 
 // Fase 3 — Portal do Cliente e Atendimento (espelha
 // backend/src/modules/tickets/dto/*.ts).

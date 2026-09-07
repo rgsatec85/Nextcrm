@@ -32,6 +32,7 @@ git push -u origin main
    psql "<connection-string-do-postgres>" -f database/migrations/0006_fase_ui_cadastro_cliente.sql
    psql "<connection-string-do-postgres>" -f database/migrations/0007_fase6_propostas.sql
    psql "<connection-string-do-postgres>" -f database/migrations/0008_fase7_pedidos.sql
+   psql "<connection-string-do-postgres>" -f database/migrations/0009_fase8_atividades_calendario.sql
    ```
 4. Depois de rodar a migration, você terá os roles `app_user` (senha
    `app_user` por padrão no script — **troque em produção**, ver nota

@@ -38,6 +38,7 @@ model Company {
   quotes        Quote[]
   orders        Order[]
   activities    Activity[]
+  agendaBlocks  AgendaBlock[]
   invoices      Invoice[]
   contracts     Contract[]
   tickets              Ticket[]
@@ -101,6 +102,7 @@ model User {
   ownedOpportunities  Opportunity[] @relation("OpportunityOwner")
   assignedTickets     Ticket[]      @relation("TicketAssignee")
   aiQueryLogs         AiQueryLog[]
+  agendaBlocks        AgendaBlock[]
 
   @@index([tenantId])
   @@index([customerId])
@@ -321,6 +323,11 @@ model Activity {
   type          String
   notes         String?
   scheduledAt   DateTime? @map("scheduled_at")
+  // Fase 8 — fim do compromisso. Só quando preenchida junto de scheduledAt a
+  // atividade vira um "slot" de calendário sujeito à checagem de conflito
+  // (ver ActivitiesService.create); sozinha, scheduledAt continua sendo só
+  // uma data-alvo (ex.: prazo de um follow-up).
+  endAt         DateTime? @map("end_at")
   doneAt        DateTime? @map("done_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @default(now()) @map("updated_at")
@@ -335,6 +342,29 @@ model Activity {
   @@index([customerId])
   @@index([opportunityId])
   @@map("activities")
+}
+
+// Fase 8 — Atividades & Calendário (RF016, fora da numeração v3.1). Bloqueio
+// pessoal de período na agenda de um usuário — ver 0009_fase8_atividades_
+// calendario.sql para a checagem de conflito que consulta esta tabela.
+model AgendaBlock {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime @map("ends_at")
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+  createdBy String?  @map("created_by")
+  updatedBy String?  @map("updated_by")
+
+  company Company @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId, startsAt, endsAt])
+  @@map("agenda_blocks")
 }
 
 // =============================================================================

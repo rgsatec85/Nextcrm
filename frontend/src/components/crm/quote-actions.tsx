@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Download } from 'lucide-react';
 
 // Espelha a máquina de estados de QuotesService no backend:
-// rascunho -> enviada -> aprovada | rejeitada. Aprovar dispara, no backend,
-// a criação automática do Pedido e o fechamento da oportunidade como ganha.
+// rascunho -> enviada -> aprovada | rejeitada. Aprovar só fecha a
+// oportunidade como ganha (QuotesService.approve) — desde a Fase 7 (RF012)
+// NÃO cria mais o Pedido sozinho; isso agora é um passo explícito à parte
+// ("Converter em Pedido", que aparece destacado no Cliente 360° assim que a
+// proposta vira 'aprovada' — ver clientes/[id]/page.tsx).
 // Fase 6 (spec v3.1): "Baixar PDF" funciona em qualquer status (usa o
 // endpoint GET /quotes/:id/pdf via o proxy) e "Marcar como vencedora" fica
 // disponível para qualquer proposta que ainda não seja a vencedora — o
