@@ -1,4 +1,4 @@
-# CRM Enterprise SaaS
+# Next CRM
 
 CRM B2B multi-tenant (Fase 0 — Fundação). Especificação completa em `docs/` e no projeto Next CRM.
 
