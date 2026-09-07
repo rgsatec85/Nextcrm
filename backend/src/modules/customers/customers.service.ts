@@ -62,7 +62,15 @@ export class CustomersService {
           contacts: { orderBy: { createdAt: 'asc' } },
           opportunities: {
             orderBy: { createdAt: 'desc' },
-            include: { quotes: { orderBy: { version: 'desc' } } },
+            include: {
+              quotes: {
+                orderBy: { version: 'desc' },
+                // Fase 7 (RF012) — o Cliente 360° usa isso para decidir
+                // entre "Converter em pedido" e um link para o pedido já
+                // existente, sem precisar de uma segunda chamada.
+                include: { orders: { select: { id: true, status: true } } },
+              },
+            },
           },
           orders: { orderBy: { createdAt: 'desc' } },
           activities: { orderBy: { scheduledAt: 'desc' } },

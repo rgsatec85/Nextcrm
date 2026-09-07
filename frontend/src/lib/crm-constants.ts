@@ -106,6 +106,17 @@ export const ORDER_STATUS_TONE: Record<string, BadgeTone> = {
   cancelado: 'danger',
 };
 
+// Fase 7 (spec v3.1, RF012) — espelha ORDER_STATUSES de
+// backend/src/modules/orders/dto/update-order-status.dto.ts.
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  confirmado: 'Confirmado',
+  em_andamento: 'Em andamento',
+  concluido: 'Concluído',
+  cancelado: 'Cancelado',
+};
+
+export const ORDER_STATUSES = Object.keys(ORDER_STATUS_LABELS);
+
 export const QUOTE_STATUS_TONE: Record<string, BadgeTone> = {
   rascunho: 'neutral',
   enviada: 'info',

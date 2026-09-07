@@ -291,6 +291,12 @@ model Order {
   customerId String   @map("customer_id")
   status     String   @default("confirmado")
   totalValue Decimal  @default(0) @map("total_value") @db.Decimal(14, 2)
+  // Fase 7 (0008_fase7_pedidos.sql, RF012) — gestão ampliada + conversão
+  // explícita a partir de uma proposta aprovada, ou criação manual.
+  deliveryDate  DateTime? @map("delivery_date") @db.Date
+  paymentTerms  String?   @map("payment_terms")
+  internalNotes String?   @map("internal_notes")
+  items         Json?
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @default(now()) @map("updated_at")
   createdBy  String?  @map("created_by")

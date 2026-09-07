@@ -23,6 +23,7 @@ import {
 import { QuotesService } from './quotes.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
+import { ConvertQuoteToOrderDto } from './dto/convert-quote-to-order.dto';
 
 @Controller('quotes')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -91,6 +92,17 @@ export class QuotesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.quotesService.markWinner(user, id);
+  }
+
+  // Fase 7 (spec v3.1, RF012) — conversão explícita em Pedido, substituindo
+  // a criação automática que existia dentro de approve() até a Fase 6.
+  @Patch(':id/convert-to-order')
+  convertToOrder(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ConvertQuoteToOrderDto,
+  ) {
+    return this.quotesService.convertToOrder(user, id, dto);
   }
 
   @Get(':id/pdf')

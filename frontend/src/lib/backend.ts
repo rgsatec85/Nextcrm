@@ -115,6 +115,10 @@ export interface Quote {
   validUntil: string | null;
   templateId: string | null;
   isWinner: boolean;
+  // Fase 7 (spec v3.1, RF012) — no máximo um pedido por proposta (índice
+  // único parcial em orders.quote_id, 0008); a UI usa isso para decidir
+  // entre mostrar "Converter em pedido" ou o status do pedido já criado.
+  orders: Array<{ id: string; status: string }>;
 }
 
 export interface OpportunityWithQuotes {
@@ -148,6 +152,13 @@ export interface Order {
   status: string;
   totalValue: string | number;
   createdAt: string;
+  // Fase 7 (spec v3.1, RF012) — gestão ampliada de Pedido. `items` vem nulo
+  // em pedidos criados antes desta coluna existir (conversão automática das
+  // Fases 1-6).
+  deliveryDate: string | null;
+  paymentTerms: string | null;
+  internalNotes: string | null;
+  items: Array<{ description: string; quantity: number; unitPrice: number }> | null;
 }
 
 export interface Activity {
@@ -392,6 +403,16 @@ export interface QuoteWithDetails extends Quote {
   template: { id: string; name: string } | null;
 }
 
+// --- Fase 7 — Pedido: conversão explícita e gestão ampliada (RF012) --------
+
+// Formato de retorno de GET /orders (lista global) — inclui cliente e, se
+// houver, o número da proposta de origem (`null` num pedido manual, sem
+// `quoteId`).
+export interface OrderWithDetails extends Order {
+  customer: { id: string; name: string };
+  quote: { id: string; number: string | null } | null;
+}
+
 export const backend = {
   signup: (payload: SignupPayload) =>
     request<AuthResponse>('/auth/signup', {
@@ -505,4 +526,10 @@ export const backend = {
 
   proposalTemplates: (token: string) =>
     request<ProposalTemplate[]>('/proposal-templates', { token }),
+
+  // Fase 7 — Pedidos (spec v3.1, RF012). Escritas (criar manual, converter
+  // de proposta, editar, mudar status) acontecem client-side via o proxy
+  // `/api/crm/orders/...` e `/api/crm/quotes/:id/convert-to-order`, mesmo
+  // padrão do resto do CRM.
+  orders: (token: string) => request<OrderWithDetails[]>('/orders', { token }),
 };

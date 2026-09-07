@@ -12,6 +12,7 @@ import { assertOwnership, ownerScopeWhere } from '../../common/crm/ownership';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { QuoteItemDto } from './dto/quote-item.dto';
+import { ConvertQuoteToOrderDto } from './dto/convert-quote-to-order.dto';
 
 function calculateTotal(items: QuoteItemDto[]): number {
   return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
@@ -89,6 +90,11 @@ export class QuotesService {
             },
           },
           template: { select: { id: true, name: true } },
+          // Fase 7 (RF012) — o frontend usa isso para decidir entre mostrar
+          // "Converter em pedido" (nenhum pedido ainda) ou um link para o
+          // pedido já existente (no máximo um, garantido pelo índice único
+          // parcial em orders.quote_id, 0008).
+          orders: { select: { id: true, status: true } },
         },
         orderBy: [{ createdAt: 'desc' }],
       }),
@@ -163,52 +169,100 @@ export class QuotesService {
   }
 
   /**
-   * Aprova a proposta e converte automaticamente em Pedido (spec §9
-   * "Conversão automática"), além de marcar a oportunidade como ganha —
-   * tudo na mesma transação, então nunca existe um estado intermediário
-   * onde a proposta está aprovada mas o pedido ainda não existe.
+   * Aprova a proposta e marca a oportunidade como ganha, na mesma
+   * transação. Até a Fase 6, aprovar também criava o Pedido automaticamente
+   * — a partir da Fase 7 (spec v3.1, RF012) isso virou um passo explícito e
+   * revisável (`convertToOrder()`), então aprovar não cria mais nada em
+   * `orders`.
    */
   async approve(user: AuthenticatedUser, id: string) {
     const quote = await this.findAccessible(user, id);
     this.assertTransition(quote.status, 'enviada', 'aprovada');
 
-    return this.prisma
-      .runWithTenant(user.tenantId, async (tx) => {
-        const approved = await tx.quote.update({
-          where: { id },
-          data: { status: 'aprovada', updatedBy: user.sub },
-        });
-
-        const order = await tx.order.create({
-          data: {
-            tenantId: user.tenantId,
-            quoteId: approved.id,
-            customerId: quote.opportunity.customerId,
-            status: 'confirmado',
-            totalValue: approved.totalValue,
-            createdBy: user.sub,
-            updatedBy: user.sub,
-          },
-        });
-
-        await tx.opportunity.update({
-          where: { id: quote.opportunityId },
-          data: { stage: 'fechado_ganho', updatedBy: user.sub },
-        });
-
-        return { quote: approved, order };
-      })
-      .then(async (result) => {
-        // Fora da transação de propósito: dispatch() é best-effort e nunca
-        // deve poder fazer o approve() falhar/dar rollback por causa de um
-        // endpoint de webhook fora do ar (spec Fase 3 — evento order.created).
-        await this.webhooksService.dispatch(user.tenantId, 'order.created', {
-          orderId: result.order.id,
-          customerId: result.order.customerId,
-          totalValue: result.order.totalValue,
-        });
-        return result;
+    return this.prisma.runWithTenant(user.tenantId, async (tx) => {
+      const approved = await tx.quote.update({
+        where: { id },
+        data: { status: 'aprovada', updatedBy: user.sub },
       });
+
+      await tx.opportunity.update({
+        where: { id: quote.opportunityId },
+        data: { stage: 'fechado_ganho', updatedBy: user.sub },
+      });
+
+      return approved;
+    });
+  }
+
+  /**
+   * Converte uma proposta aprovada em Pedido (spec v3.1, RF012) — passo
+   * explícito que substitui a conversão automática da Fase 1-6. Sem
+   * `dto.items`/`dto.paymentTerms`/etc., o Pedido herda os valores da
+   * própria proposta; informar `dto.items` permite revisar
+   * quantidades/preços antes de confirmar. Só funciona uma vez por
+   * proposta — o índice único parcial `idx_orders_quote_id_unique` (0008) é
+   * a segunda camada de proteção contra converter a mesma proposta duas
+   * vezes (a checagem abaixo é a primeira, mas tem uma janela de corrida
+   * teórica entre o `findFirst` e o `create`).
+   */
+  async convertToOrder(
+    user: AuthenticatedUser,
+    id: string,
+    dto: ConvertQuoteToOrderDto,
+  ) {
+    const quote = await this.findAccessible(user, id);
+
+    if (quote.status !== 'aprovada') {
+      throw new ConflictException(
+        'Só é possível converter em pedido uma proposta aprovada',
+      );
+    }
+
+    const items = dto.items ?? (quote.items as unknown as QuoteItemDto[]);
+    const totalValue = dto.items
+      ? calculateTotal(dto.items)
+      : Number(quote.totalValue);
+
+    const order = await this.prisma.runWithTenant(user.tenantId, async (tx) => {
+      const alreadyConverted = await tx.order.findFirst({
+        where: { quoteId: id },
+        select: { id: true },
+      });
+      if (alreadyConverted) {
+        throw new ConflictException(
+          'Esta proposta já foi convertida em pedido',
+        );
+      }
+
+      return tx.order.create({
+        data: {
+          tenantId: user.tenantId,
+          quoteId: quote.id,
+          customerId: quote.opportunity.customerId,
+          status: 'confirmado',
+          totalValue,
+          items: items as unknown as object,
+          deliveryDate: dto.deliveryDate
+            ? new Date(dto.deliveryDate)
+            : undefined,
+          paymentTerms: dto.paymentTerms,
+          internalNotes: dto.internalNotes,
+          createdBy: user.sub,
+          updatedBy: user.sub,
+        },
+      });
+    });
+
+    // Fora da transação de propósito: dispatch() é best-effort e nunca deve
+    // poder fazer a conversão falhar/dar rollback por causa de um endpoint
+    // de webhook fora do ar (mesmo raciocínio de sempre, spec Fase 3).
+    await this.webhooksService.dispatch(user.tenantId, 'order.created', {
+      orderId: order.id,
+      customerId: order.customerId,
+      totalValue: order.totalValue,
+    });
+
+    return order;
   }
 
   /**

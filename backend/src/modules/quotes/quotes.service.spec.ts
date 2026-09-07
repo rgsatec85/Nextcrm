@@ -115,7 +115,10 @@ describe('QuotesService', () => {
     );
   });
 
-  it('approve() cria o Pedido automaticamente e fecha a oportunidade como ganha', async () => {
+  // Fase 7 (spec v3.1, RF012): aprovar não cria mais o Pedido sozinho — só
+  // fecha a oportunidade como ganha. A criação do Pedido virou um passo
+  // explícito (convertToOrder(), testado abaixo).
+  it('approve() fecha a oportunidade como ganha e NÃO cria pedido nem dispara webhook', async () => {
     const findFirst = jest.fn().mockResolvedValue({
       id: 'q1',
       status: 'enviada',
@@ -126,7 +129,7 @@ describe('QuotesService', () => {
     const quoteUpdate = jest
       .fn()
       .mockResolvedValue({ id: 'q1', status: 'aprovada', totalValue: 250 });
-    const orderCreate = jest.fn().mockImplementation(({ data }) => data);
+    const orderCreate = jest.fn();
     const opportunityUpdate = jest.fn().mockResolvedValue({});
 
     const { service, webhooksService } = makeService({
@@ -136,6 +139,38 @@ describe('QuotesService', () => {
     });
 
     const result = await service.approve(user('admin'), 'q1');
+
+    expect(orderCreate).not.toHaveBeenCalled();
+    expect(opportunityUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'o1' },
+        data: expect.objectContaining({ stage: 'fechado_ganho' }),
+      }),
+    );
+    expect(result.status).toBe('aprovada');
+    expect(webhooksService.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('convertToOrder() cria o pedido herdando itens/valor da proposta quando nada é informado', async () => {
+    const findFirst = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'q1',
+        status: 'aprovada',
+        opportunityId: 'o1',
+        totalValue: 250,
+        items: [{ description: 'Item único', quantity: 1, unitPrice: 250 }],
+        opportunity: { ownerId: 'user-1', customerId: 'c1' },
+      })
+      .mockResolvedValueOnce(null); // nenhum pedido existente ainda para esta proposta
+    const orderCreate = jest.fn().mockImplementation(({ data }) => data);
+
+    const { service, webhooksService } = makeService({
+      quote: { findFirst },
+      order: { findFirst, create: orderCreate },
+    });
+
+    const order = await service.convertToOrder(user('admin'), 'q1', {});
 
     expect(orderCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -147,17 +182,79 @@ describe('QuotesService', () => {
         }),
       }),
     );
-    expect(opportunityUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'o1' },
-        data: expect.objectContaining({ stage: 'fechado_ganho' }),
-      }),
-    );
-    expect(result.order.customerId).toBe('c1');
+    expect(order.customerId).toBe('c1');
     expect(webhooksService.dispatch).toHaveBeenCalledWith(
       'tenant-1',
       'order.created',
       expect.objectContaining({ customerId: 'c1', totalValue: 250 }),
     );
+  });
+
+  it('convertToOrder() permite sobrescrever itens/valor/prazo de entrega/condição de pagamento', async () => {
+    const findFirst = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'q1',
+        status: 'aprovada',
+        opportunityId: 'o1',
+        totalValue: 250,
+        items: [{ description: 'Item único', quantity: 1, unitPrice: 250 }],
+        opportunity: { ownerId: 'user-1', customerId: 'c1' },
+      })
+      .mockResolvedValueOnce(null);
+    const orderCreate = jest.fn().mockImplementation(({ data }) => data);
+
+    const { service } = makeService({
+      quote: { findFirst },
+      order: { findFirst, create: orderCreate },
+    });
+
+    const order = await service.convertToOrder(user('admin'), 'q1', {
+      items: [{ description: 'Item revisado', quantity: 2, unitPrice: 100 }],
+      deliveryDate: '2026-12-01',
+      paymentTerms: '30/60/90',
+    });
+
+    expect(order.totalValue).toBe(200);
+    expect(order.paymentTerms).toBe('30/60/90');
+  });
+
+  it('convertToOrder() rejeita proposta que ainda não foi aprovada', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'q1',
+      status: 'enviada',
+      opportunityId: 'o1',
+      opportunity: { ownerId: 'user-1', customerId: 'c1' },
+    });
+    const { service } = makeService({ quote: { findFirst } });
+
+    await expect(
+      service.convertToOrder(user('admin'), 'q1', {}),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('convertToOrder() rejeita converter a mesma proposta duas vezes', async () => {
+    const quoteFindFirst = jest.fn().mockResolvedValue({
+      id: 'q1',
+      status: 'aprovada',
+      opportunityId: 'o1',
+      totalValue: 250,
+      items: [],
+      opportunity: { ownerId: 'user-1', customerId: 'c1' },
+    });
+    const orderFindFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 'existing-order' });
+    const orderCreate = jest.fn();
+
+    const { service } = makeService({
+      quote: { findFirst: quoteFindFirst },
+      order: { findFirst: orderFindFirst, create: orderCreate },
+    });
+
+    await expect(
+      service.convertToOrder(user('admin'), 'q1', {}),
+    ).rejects.toThrow(ConflictException);
+    expect(orderCreate).not.toHaveBeenCalled();
   });
 });

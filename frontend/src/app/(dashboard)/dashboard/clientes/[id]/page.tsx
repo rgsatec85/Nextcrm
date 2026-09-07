@@ -10,6 +10,9 @@ import { NewActivityForm } from '@/components/crm/new-activity-form';
 import { CompleteActivityButton } from '@/components/crm/complete-activity-button';
 import { NewQuoteForm } from '@/components/crm/new-quote-form';
 import { QuoteActions } from '@/components/crm/quote-actions';
+import { ConvertQuoteToOrderForm } from '@/components/crm/convert-quote-to-order-form';
+import { EditOrderForm } from '@/components/crm/edit-order-form';
+import { OrderStatusSelect } from '@/components/crm/order-status-select';
 import { GenerateInvoicesForm } from '@/components/crm/generate-invoices-form';
 import { RegisterPaymentForm } from '@/components/crm/register-payment-form';
 import { CancelInvoiceButton } from '@/components/crm/cancel-invoice-button';
@@ -28,6 +31,7 @@ import {
   COMPANY_SIZE_LABELS,
   INVOICE_STATUS_TONE,
   LEAD_SOURCE_LABELS,
+  ORDER_STATUS_LABELS,
   ORDER_STATUS_TONE,
   PERSON_TYPE_LABELS,
   QUOTE_STATUS_TONE,
@@ -344,8 +348,8 @@ export default async function ClienteDetailPage({
                       Propostas
                     </p>
                     {o.quotes.map((q) => (
-                      <div key={q.id} className="flex items-center justify-between text-sm">
-                        <span className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                      <div key={q.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-300">
                           {q.number ?? `v${q.version}`} · R$ {formatMoney(q.totalValue)}
                           <Badge tone={QUOTE_STATUS_TONE[q.status] ?? 'neutral'}>{q.status}</Badge>
                           {q.isWinner && <Badge tone="accent">vencedora</Badge>}
@@ -354,8 +358,29 @@ export default async function ClienteDetailPage({
                               válida até {new Date(q.validUntil).toLocaleDateString('pt-BR')}
                             </span>
                           )}
+                          {/* Fase 7 (RF012) — no máximo um pedido por proposta
+                              (índice único parcial em orders.quote_id, 0008):
+                              mostra o status dele em vez do botão de converter. */}
+                          {q.orders.length > 0 && (
+                            <Badge tone={ORDER_STATUS_TONE[q.orders[0].status] ?? 'neutral'}>
+                              Pedido: {ORDER_STATUS_LABELS[q.orders[0].status] ?? q.orders[0].status}
+                            </Badge>
+                          )}
                         </span>
-                        <QuoteActions quoteId={q.id} status={q.status} isWinner={q.isWinner} />
+                        <span className="flex items-center gap-2">
+                          <QuoteActions quoteId={q.id} status={q.status} isWinner={q.isWinner} />
+                          {q.status === 'aprovada' && q.orders.length === 0 && (
+                            <CreateDrawer
+                              triggerLabel="Converter em Pedido"
+                              title="Converter proposta em pedido"
+                              description="Itens, prazo de entrega e condição de pagamento podem ser revisados antes de confirmar."
+                              size="sm"
+                              variant="secondary"
+                            >
+                              <ConvertQuoteToOrderForm quoteId={q.id} items={q.items} />
+                            </CreateDrawer>
+                          )}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -374,12 +399,16 @@ export default async function ClienteDetailPage({
       </Card>
 
       <Card>
-        <CardHeader icon={<Package className="h-4 w-4" />} title={`Pedidos (${customer.orders.length})`} />
+        <CardHeader
+          icon={<Package className="h-4 w-4" />}
+          title={`Pedidos (${customer.orders.length})`}
+          description="Criados a partir da conversão de uma proposta aprovada (ou manualmente em /dashboard/pedidos)."
+        />
         {customer.orders.length === 0 ? (
           <EmptyState
             icon={Package}
             title="Nenhum pedido ainda"
-            description="Pedidos são criados automaticamente quando uma proposta é aprovada."
+            description="Converta uma proposta aprovada acima, em “Propostas”."
           />
         ) : (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -387,17 +416,24 @@ export default async function ClienteDetailPage({
               const hasInvoices = customer.invoices.some((inv) => inv.orderId === o.id);
               return (
                 <div key={o.id} className="px-5 py-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <Badge tone={ORDER_STATUS_TONE[o.status] ?? 'neutral'}>{o.status}</Badge>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <OrderStatusSelect orderId={o.id} status={o.status} />
                     <span className="font-medium text-slate-900 dark:text-slate-100">
                       R$ {formatMoney(o.totalValue)}
                     </span>
                   </div>
-                  {!hasInvoices && (
-                    <div className="mt-1">
-                      <GenerateInvoicesForm orderId={o.id} />
-                    </div>
-                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    {o.deliveryDate && (
+                      <span>Entrega: {new Date(o.deliveryDate).toLocaleDateString('pt-BR')}</span>
+                    )}
+                    {o.paymentTerms && <span>Pagamento: {o.paymentTerms}</span>}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    {!hasInvoices && <GenerateInvoicesForm orderId={o.id} />}
+                    <EditDrawer triggerLabel="Editar" title="Editar pedido" size="sm" variant="ghost">
+                      <EditOrderForm order={o} />
+                    </EditDrawer>
+                  </div>
                 </div>
               );
             })}
