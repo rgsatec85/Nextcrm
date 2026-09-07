@@ -3,9 +3,13 @@ import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { backend, BackendError } from '@/lib/backend';
 import { SESSION_COOKIE } from '@/lib/session';
-import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS } from '@/lib/crm-constants';
+import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS, TICKET_STATUS_TONE } from '@/lib/crm-constants';
 import { TicketStatusForm } from '@/components/crm/ticket-status-form';
 import { NewTicketCommentForm } from '@/components/crm/new-ticket-comment-form';
+import { Card, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
 
 export default async function ChamadoDetailPage({
   params,
@@ -29,15 +33,18 @@ export default async function ChamadoDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/chamados" className="text-sm text-brand-600 hover:underline">
-        ← Chamados
+      <Link
+        href="/dashboard/chamados"
+        className="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:underline"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> Chamados
       </Link>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="flex items-start justify-between">
+      <Card className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">{ticket.subject}</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">{ticket.subject}</h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {ticket.customer?.name ?? '—'} · prioridade{' '}
               {TICKET_PRIORITY_LABELS[ticket.priority] ?? ticket.priority} · SLA até{' '}
               {new Date(ticket.slaDueAt).toLocaleString('pt-BR')}
@@ -46,38 +53,41 @@ export default async function ChamadoDetailPage({
           <TicketStatusForm ticketId={ticket.id} status={ticket.status} />
         </div>
         {ticket.description && (
-          <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{ticket.description}</p>
+          <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+            {ticket.description}
+          </p>
         )}
-      </section>
+        <div className="mt-3">
+          <Badge tone={TICKET_STATUS_TONE[ticket.status] ?? 'neutral'}>
+            Status: {TICKET_STATUS_LABELS[ticket.status] ?? ticket.status}
+          </Badge>
+        </div>
+      </Card>
 
-      <section className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="font-medium text-slate-900">
-            Comentários ({ticket.comments?.length ?? 0})
-          </h2>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {(ticket.comments ?? []).map((c) => (
-            <div key={c.id} className="px-4 py-3 text-sm">
-              <p className="text-xs font-medium uppercase text-slate-400">
-                {c.authorType === 'cliente' ? 'Cliente' : 'Equipe'} ·{' '}
-                {new Date(c.createdAt).toLocaleString('pt-BR')}
-              </p>
-              <p className="mt-1 whitespace-pre-wrap text-slate-700">{c.body}</p>
-            </div>
-          ))}
-          {(ticket.comments ?? []).length === 0 && (
-            <p className="px-4 py-4 text-sm text-slate-500">Nenhum comentário ainda.</p>
-          )}
-        </div>
-        <div className="border-t border-slate-200 px-4 py-4">
+      <Card>
+        <CardHeader
+          icon={<MessageSquare className="h-4 w-4" />}
+          title={`Comentários (${ticket.comments?.length ?? 0})`}
+        />
+        {(ticket.comments ?? []).length === 0 ? (
+          <EmptyState icon={MessageSquare} title="Nenhum comentário ainda" />
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {(ticket.comments ?? []).map((c) => (
+              <div key={c.id} className="px-5 py-3 text-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  {c.authorType === 'cliente' ? 'Cliente' : 'Equipe'} ·{' '}
+                  {new Date(c.createdAt).toLocaleString('pt-BR')}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-slate-700 dark:text-slate-300">{c.body}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="border-t border-slate-200 px-5 py-4 dark:border-slate-800">
           <NewTicketCommentForm endpoint={`/api/crm/tickets/${ticket.id}/comments`} />
         </div>
-      </section>
-
-      <p className="text-xs text-slate-400">
-        Status: {TICKET_STATUS_LABELS[ticket.status] ?? ticket.status}
-      </p>
+      </Card>
     </div>
   );
 }

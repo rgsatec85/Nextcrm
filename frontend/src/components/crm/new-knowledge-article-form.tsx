@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
 
-export function NewKnowledgeArticleForm() {
+export function NewKnowledgeArticleForm({ onSuccess }: { onSuccess?: () => void } = {}) {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -37,6 +37,7 @@ export function NewKnowledgeArticleForm() {
       setCategory('');
       setBody('');
       router.refresh();
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

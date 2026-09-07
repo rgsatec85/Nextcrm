@@ -4,7 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
 
-export function NewContactForm({ customerId }: { customerId: string }) {
+export function NewContactForm({
+  customerId,
+  onSuccess,
+}: {
+  customerId: string;
+  onSuccess?: () => void;
+}) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
@@ -43,6 +49,7 @@ export function NewContactForm({ customerId }: { customerId: string }) {
       setEmail('');
       setPhone('');
       router.refresh();
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

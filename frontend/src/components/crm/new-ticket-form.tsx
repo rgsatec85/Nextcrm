@@ -8,9 +8,10 @@ import { TICKET_PRIORITY_LABELS } from '@/lib/crm-constants';
 interface NewTicketFormProps {
   customerId?: string;
   customers?: { id: string; name: string }[];
+  onSuccess?: () => void;
 }
 
-export function NewTicketForm({ customerId, customers }: NewTicketFormProps) {
+export function NewTicketForm({ customerId, customers, onSuccess }: NewTicketFormProps) {
   const router = useRouter();
   const [selectedCustomerId, setSelectedCustomerId] = useState(
     customerId ?? customers?.[0]?.id ?? '',
@@ -55,6 +56,7 @@ export function NewTicketForm({ customerId, customers }: NewTicketFormProps) {
       setDescription('');
       setPriority('media');
       router.refresh();
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

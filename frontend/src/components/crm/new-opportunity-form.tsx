@@ -9,9 +9,10 @@ interface NewOpportunityFormProps {
   customerId?: string;
   // Uso no Pipeline: precisa escolher a quem a oportunidade pertence.
   customers?: { id: string; name: string }[];
+  onSuccess?: () => void;
 }
 
-export function NewOpportunityForm({ customerId, customers }: NewOpportunityFormProps) {
+export function NewOpportunityForm({ customerId, customers, onSuccess }: NewOpportunityFormProps) {
   const router = useRouter();
   const [selectedCustomerId, setSelectedCustomerId] = useState(
     customerId ?? customers?.[0]?.id ?? '',
@@ -53,6 +54,7 @@ export function NewOpportunityForm({ customerId, customers }: NewOpportunityForm
       setTitle('');
       setValue('');
       router.refresh();
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

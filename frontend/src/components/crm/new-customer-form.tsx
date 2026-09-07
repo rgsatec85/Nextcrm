@@ -7,7 +7,7 @@ import { FormField } from '@/components/form-field';
 // Formulário de criação de cliente (spec §10). Passa pelo proxy autenticado
 // em /api/crm/* em vez de chamar o backend direto — client components não
 // têm acesso ao cookie httpOnly com o JWT.
-export function NewCustomerForm() {
+export function NewCustomerForm({ onSuccess }: { onSuccess?: () => void } = {}) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [segment, setSegment] = useState('');
@@ -46,6 +46,7 @@ export function NewCustomerForm() {
       setEmail('');
       setPhone('');
       router.refresh();
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

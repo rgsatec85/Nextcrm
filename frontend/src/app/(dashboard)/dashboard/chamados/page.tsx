@@ -2,15 +2,26 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { backend } from '@/lib/backend';
 import { SESSION_COOKIE } from '@/lib/session';
-import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS } from '@/lib/crm-constants';
+import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS, TICKET_STATUS_TONE } from '@/lib/crm-constants';
 import { NewTicketForm } from '@/components/crm/new-ticket-form';
+import { CreateDrawer } from '@/components/ui/create-drawer';
+import { KpiCard } from '@/components/ui/kpi-card';
+import { Card, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { AlertOctagon, CircleDot, LifeBuoy, Timer } from 'lucide-react';
 
-const STATUS_BADGE: Record<string, string> = {
-  aberto: 'bg-amber-100 text-amber-700',
-  em_andamento: 'bg-brand-100 text-brand-700',
-  resolvido: 'bg-emerald-100 text-emerald-700',
-  fechado: 'bg-slate-100 text-slate-600',
-};
+// Fora do componente de propósito: `Date.now()` é impuro e o linter do
+// React Compiler não permite chamada direta impura dentro do corpo de um
+// componente — isolar num helper de módulo resolve isso sem mudar o
+// resultado (é uma página server-side, recalculada a cada request de
+// qualquer forma).
+function isSlaBreached(ticket: { status: string; slaDueAt: string }) {
+  return (
+    (ticket.status === 'aberto' || ticket.status === 'em_andamento') &&
+    new Date(ticket.slaDueAt).getTime() < Date.now()
+  );
+}
 
 // Atendimento interno (spec Fase 3): chamados de todos os clientes visíveis
 // ao usuário (ABAC de vendedor aplicado no backend — TicketsService).
@@ -23,51 +34,70 @@ export default async function ChamadosPage() {
     backend.customers(token),
   ]);
 
+  const openCount = tickets.filter((t) => t.status === 'aberto').length;
+  const inProgressCount = tickets.filter((t) => t.status === 'em_andamento').length;
+  // Backend ainda não expõe um breakdown pronto de SLA estourado — calculado
+  // aqui a partir de slaDueAt (já retornado por GET /tickets) comparado a
+  // agora, só para chamados ainda não resolvidos/fechados.
+  const slaBreached = tickets.filter(isSlaBreached).length;
+
   return (
     <div className="space-y-8">
-      <section>
-        <h1 className="text-2xl font-semibold text-slate-900">Chamados</h1>
-        <p className="text-sm text-slate-500">
-          Atendimento interno — SLA calculado pela prioridade no momento da abertura.
-        </p>
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-medium text-slate-900">Abrir novo chamado</h2>
-        <NewTicketForm customers={customers.map((c) => ({ id: c.id, name: c.name }))} />
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="font-medium text-slate-900">Todos os chamados ({tickets.length})</h2>
+      <section className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Chamados</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Atendimento interno — SLA calculado pela prioridade no momento da abertura.
+          </p>
         </div>
-        <div className="divide-y divide-slate-100">
-          {tickets.map((t) => (
-            <Link
-              key={t.id}
-              href={`/dashboard/chamados/${t.id}`}
-              className="flex items-center justify-between px-4 py-3 text-sm hover:bg-slate-50"
-            >
-              <div>
-                <p className="font-medium text-slate-900">{t.subject}</p>
-                <p className="text-slate-500">
-                  {t.customer?.name ?? '—'} · prioridade{' '}
-                  {TICKET_PRIORITY_LABELS[t.priority] ?? t.priority} · SLA até{' '}
-                  {new Date(t.slaDueAt).toLocaleString('pt-BR')}
-                </p>
-              </div>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs ${STATUS_BADGE[t.status] ?? 'bg-slate-100 text-slate-600'}`}
-              >
-                {TICKET_STATUS_LABELS[t.status] ?? t.status}
-              </span>
-            </Link>
-          ))}
-          {tickets.length === 0 && (
-            <p className="px-4 py-6 text-sm text-slate-500">Nenhum chamado aberto ainda.</p>
+        <CreateDrawer triggerLabel="Abrir chamado">
+          {(close) => (
+            <NewTicketForm
+              customers={customers.map((c) => ({ id: c.id, name: c.name }))}
+              onSuccess={close}
+            />
           )}
-        </div>
+        </CreateDrawer>
       </section>
+
+      <section className="grid gap-4 sm:grid-cols-3">
+        <KpiCard label="Abertos" value={String(openCount)} icon={CircleDot} tone="warning" />
+        <KpiCard label="Em andamento" value={String(inProgressCount)} icon={Timer} tone="info" />
+        <KpiCard label="SLA estourado" value={String(slaBreached)} icon={AlertOctagon} tone="danger" />
+      </section>
+
+      <Card>
+        <CardHeader icon={<LifeBuoy className="h-4 w-4" />} title={`Todos os chamados (${tickets.length})`} />
+        {tickets.length === 0 ? (
+          <EmptyState
+            icon={LifeBuoy}
+            title="Nenhum chamado aberto ainda"
+            description="Quando um cliente (ou sua equipe) abrir um chamado, ele aparece aqui."
+          />
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {tickets.map((t) => (
+              <Link
+                key={t.id}
+                href={`/dashboard/chamados/${t.id}`}
+                className="flex items-center justify-between gap-4 px-5 py-3 text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
+                  <p className="truncate text-slate-500 dark:text-slate-400">
+                    {t.customer?.name ?? '—'} · prioridade{' '}
+                    {TICKET_PRIORITY_LABELS[t.priority] ?? t.priority} · SLA até{' '}
+                    {new Date(t.slaDueAt).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+                <Badge tone={TICKET_STATUS_TONE[t.status] ?? 'neutral'}>
+                  {TICKET_STATUS_LABELS[t.status] ?? t.status}
+                </Badge>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

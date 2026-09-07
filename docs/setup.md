@@ -146,6 +146,31 @@ A partir da Fase 5 (Hardening, Escala e Observabilidade), também tem:
   dashboard para escalar Supabase/Render/Vercel) e
   `docs/fase5-hardening-observabilidade.md` (visão geral da fase).
 
+## Redesign visual do dashboard interno (UI-only, sem numeração de Fase)
+
+O dashboard interno (`/dashboard/**`) passou por uma modernização puramente
+visual/interação — nenhuma regra de negócio mudou. O que é diferente ao usar:
+
+- O menu principal virou uma **sidebar lateral com ícones**, colapsável (o
+  botão no rodapé da sidebar recolhe para só ícones — a preferência fica
+  salva no navegador). O antigo header horizontal foi removido.
+- **Todo cadastro (Novo cliente, Nova oportunidade, Novo contrato, Novo
+  contato, Nova atividade, Abrir chamado, Novo artigo, Nova assinatura de
+  webhook, Novo acesso ao portal, Nova proposta, Gerar parcelas, Registrar
+  pagamento) agora abre num painel lateral (drawer) a partir de um botão
+  "Novo X"** — a grid/lista em si só mostra dados, nunca um formulário
+  exposto. A lógica de validação/envio de cada formulário não mudou, só
+  onde e como ele é acionado.
+- Dashboard, Pipeline, Financeiro, Contratos e Chamados ganharam **KPIs e
+  gráficos** (biblioteca `recharts`), reaproveitando dados que os próprios
+  endpoints já retornavam (nenhum endpoint novo no backend).
+- Ícones em todo o menu e nos cabeçalhos de seção vêm de `lucide-react`.
+- Portal do Cliente (`/portal/**`) e as páginas de autenticação
+  (`/login`, `/cadastro`) **não foram tocados** nesta rodada.
+
+Detalhes de decisões de design (paleta, como trocar de marca depois,
+padrão de drawer, o que ficou de fora) em `docs/fase-ui-modernizacao.md`.
+
 ## 4. Rodando testes e verificações
 
 ```bash

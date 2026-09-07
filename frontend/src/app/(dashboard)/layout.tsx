@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { backend } from '@/lib/backend';
 import { SESSION_COOKIE } from '@/lib/session';
 import { LogoutButton } from '@/components/logout-button';
+import { Sidebar } from '@/components/layout/sidebar';
 
 export default async function DashboardLayout({
   children,
@@ -20,6 +20,7 @@ export default async function DashboardLayout({
   // sessão encerrada e mandamos de volta pro login (defesa em profundidade
   // além do middleware, que só checa a presença do cookie).
   const me = (await backend.me(token).catch(() => null)) as {
+    name: string;
     role: { slug: string };
   } | null;
   if (!me) {
@@ -33,44 +34,29 @@ export default async function DashboardLayout({
     redirect('/portal');
   }
 
+  // Nome da empresa no topo da sidebar — não crítico: se a chamada falhar
+  // por qualquer motivo, cai para um rótulo genérico em vez de quebrar todo
+  // o layout do dashboard.
+  const company = await backend
+    .myCompany(token)
+    .catch(() => null) as { name: string } | null;
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <span className="font-semibold text-brand-700">CRM Enterprise SaaS</span>
-          <nav className="flex items-center gap-5 text-sm font-medium text-slate-600">
-            <Link href="/dashboard" className="hover:text-brand-700">
-              Dashboard
-            </Link>
-            <Link href="/dashboard/clientes" className="hover:text-brand-700">
-              Clientes
-            </Link>
-            <Link href="/dashboard/pipeline" className="hover:text-brand-700">
-              Pipeline
-            </Link>
-            <Link href="/dashboard/financeiro" className="hover:text-brand-700">
-              Financeiro
-            </Link>
-            <Link href="/dashboard/contratos" className="hover:text-brand-700">
-              Contratos
-            </Link>
-            <Link href="/dashboard/chamados" className="hover:text-brand-700">
-              Chamados
-            </Link>
-            <Link href="/dashboard/base-de-conhecimento" className="hover:text-brand-700">
-              Base de conhecimento
-            </Link>
-            <Link href="/dashboard/webhooks" className="hover:text-brand-700">
-              Webhooks
-            </Link>
-            <Link href="/dashboard/assistente" className="hover:text-brand-700">
-              Assistente
-            </Link>
-          </nav>
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+      <Sidebar companyName={company?.name ?? 'CRM Enterprise'} />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 dark:border-slate-800 dark:bg-slate-900">
+          <div>
+            <p className="text-xs text-slate-400">Bem-vindo(a)</p>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{me.name}</p>
+          </div>
           <LogoutButton />
-        </div>
-      </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+        </header>
+        <main className="flex-1 overflow-x-hidden px-6 py-8">
+          <div className="mx-auto max-w-6xl">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

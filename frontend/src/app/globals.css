@@ -5,3 +5,53 @@
 body {
   @apply bg-slate-50 text-slate-900;
 }
+
+/* Animações do painel lateral (Drawer) usado pelos formulários de novo
+   cadastro — spec da redesign de UI. Mantidas em CSS puro (sem plugin de
+   animação) para não adicionar mais uma dependência só por isto. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Scrollbar discreta para a sidebar e o corpo do drawer em navegadores
+   WebKit — puramente cosmético, sem afetar o layout em quem não suporta. */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: theme('colors.slate.300');
+  border-radius: 9999px;
+}

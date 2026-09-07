@@ -7,9 +7,10 @@ import { FormField } from '@/components/form-field';
 interface NewContractFormProps {
   customerId?: string;
   customers?: { id: string; name: string }[];
+  onSuccess?: () => void;
 }
 
-export function NewContractForm({ customerId, customers }: NewContractFormProps) {
+export function NewContractForm({ customerId, customers, onSuccess }: NewContractFormProps) {
   const router = useRouter();
   const [selectedCustomerId, setSelectedCustomerId] = useState(
     customerId ?? customers?.[0]?.id ?? '',
@@ -59,6 +60,7 @@ export function NewContractForm({ customerId, customers }: NewContractFormProps)
       setStartDate('');
       setEndDate('');
       router.refresh();
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

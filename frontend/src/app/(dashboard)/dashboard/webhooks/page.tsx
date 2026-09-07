@@ -4,6 +4,11 @@ import { SESSION_COOKIE } from '@/lib/session';
 import { WEBHOOK_EVENT_LABELS } from '@/lib/crm-constants';
 import { NewWebhookForm } from '@/components/crm/new-webhook-form';
 import { WebhookActions } from '@/components/crm/webhook-actions';
+import { CreateDrawer } from '@/components/ui/create-drawer';
+import { Card, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Webhook as WebhookIcon } from 'lucide-react';
 
 // Webhooks (spec Fase 3) — restrito a admin no backend (WebhooksController).
 export default async function WebhooksPage() {
@@ -18,8 +23,8 @@ export default async function WebhooksPage() {
   if (!webhooks) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold text-slate-900">Webhooks</h1>
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Webhooks</h1>
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
           Esta página é restrita a administradores.
         </p>
       </div>
@@ -28,52 +33,49 @@ export default async function WebhooksPage() {
 
   return (
     <div className="space-y-8">
-      <section>
-        <h1 className="text-2xl font-semibold text-slate-900">Webhooks</h1>
-        <p className="text-sm text-slate-500">
-          Eventos disparados: pedido criado, fatura paga, chamado atualizado e contrato
-          vencendo (varredura diária). Entregas são melhor-esforço — sem fila de retry
-          nesta fase.
-        </p>
+      <section className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Webhooks</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Eventos disparados: pedido criado, fatura paga, chamado atualizado e contrato
+            vencendo (varredura diária). Entregas são melhor-esforço — sem fila de retry
+            nesta fase.
+          </p>
+        </div>
+        {/* Sem onSuccess: o formulário mostra o secret gerado uma única vez
+            após o POST, então o drawer fica aberto até o usuário fechar
+            manualmente (copiar o secret antes de fechar). */}
+        <CreateDrawer
+          triggerLabel="Nova assinatura"
+          description="Guarde o secret exibido após criar — ele não é mostrado de novo."
+        >
+          {() => <NewWebhookForm />}
+        </CreateDrawer>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-medium text-slate-900">Nova assinatura</h2>
-        <NewWebhookForm />
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="font-medium text-slate-900">Assinaturas ({webhooks.length})</h2>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {webhooks.map((w) => (
-            <div key={w.id} className="flex items-center justify-between px-4 py-3 text-sm">
-              <div>
-                <p className="font-medium text-slate-900">{w.url}</p>
-                <p className="text-slate-500">
-                  {w.events.map((e) => WEBHOOK_EVENT_LABELS[e] ?? e).join(', ')}
-                </p>
+      <Card>
+        <CardHeader icon={<WebhookIcon className="h-4 w-4" />} title={`Assinaturas (${webhooks.length})`} />
+        {webhooks.length === 0 ? (
+          <EmptyState icon={WebhookIcon} title="Nenhum webhook cadastrado ainda" />
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {webhooks.map((w) => (
+              <div key={w.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900 dark:text-slate-100">{w.url}</p>
+                  <p className="text-slate-500 dark:text-slate-400">
+                    {w.events.map((e) => WEBHOOK_EVENT_LABELS[e] ?? e).join(', ')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge tone={w.isActive ? 'success' : 'neutral'}>{w.isActive ? 'Ativo' : 'Inativo'}</Badge>
+                  <WebhookActions webhookId={w.id} isActive={w.isActive} />
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className={
-                    w.isActive
-                      ? 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700'
-                      : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600'
-                  }
-                >
-                  {w.isActive ? 'Ativo' : 'Inativo'}
-                </span>
-                <WebhookActions webhookId={w.id} isActive={w.isActive} />
-              </div>
-            </div>
-          ))}
-          {webhooks.length === 0 && (
-            <p className="px-4 py-6 text-sm text-slate-500">Nenhum webhook cadastrado ainda.</p>
-          )}
-        </div>
-      </section>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

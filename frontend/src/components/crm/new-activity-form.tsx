@@ -7,9 +7,11 @@ import { ACTIVITY_TYPE_LABELS } from '@/lib/crm-constants';
 export function NewActivityForm({
   customerId,
   opportunityId,
+  onSuccess,
 }: {
   customerId?: string;
   opportunityId?: string;
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [type, setType] = useState('reuniao');
@@ -47,6 +49,7 @@ export function NewActivityForm({
       setNotes('');
       setScheduledAt('');
       router.refresh();
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

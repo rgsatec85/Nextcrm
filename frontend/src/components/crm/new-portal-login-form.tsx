@@ -4,7 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
 
-export function NewPortalLoginForm({ customerId }: { customerId: string }) {
+export function NewPortalLoginForm({
+  customerId,
+  onSuccess,
+}: {
+  customerId: string;
+  onSuccess?: () => void;
+}) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,6 +37,7 @@ export function NewPortalLoginForm({ customerId }: { customerId: string }) {
       setEmail('');
       setPassword('');
       router.refresh();
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

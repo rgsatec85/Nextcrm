@@ -1,3 +1,5 @@
+import type { BadgeTone } from '@/components/ui/badge';
+
 // Espelha backend/src/modules/opportunities/stages.ts — mantido separado (e
 // não importado do backend) porque frontend e backend são pacotes distintos
 // nesta arquitetura de monorepo sem workspace compartilhado.
@@ -50,3 +52,56 @@ export const WEBHOOK_EVENT_LABELS: Record<string, string> = {
   'ticket.updated': 'Chamado atualizado',
   'contract.expiring': 'Contrato vencendo',
 };
+
+// --- Refinamento visual — tons semânticos por status ------------------------
+// Mapas de status → `BadgeTone` (ver components/ui/badge.tsx), um por
+// entidade, para que toda tabela/lista use a mesma cor para o mesmo status
+// em vez de decidir isso separadamente em cada page.tsx. Valores possíveis
+// espelham os enums de string validados nos DTOs do backend (não são um
+// palpite): tickets (`update-ticket-status.dto.ts`), faturas
+// (`invoices.service.ts`), pedidos (`update-order-status.dto.ts`), propostas
+// (`quotes.service.ts`) e contratos (`contracts.service.ts`).
+
+export const TICKET_STATUS_TONE: Record<string, BadgeTone> = {
+  aberto: 'warning',
+  em_andamento: 'info',
+  resolvido: 'success',
+  fechado: 'neutral',
+};
+
+export const INVOICE_STATUS_TONE: Record<string, BadgeTone> = {
+  aberto: 'warning',
+  parcial: 'warning',
+  pago: 'success',
+  cancelado: 'neutral',
+};
+
+export const ORDER_STATUS_TONE: Record<string, BadgeTone> = {
+  confirmado: 'info',
+  em_andamento: 'warning',
+  concluido: 'success',
+  cancelado: 'danger',
+};
+
+export const QUOTE_STATUS_TONE: Record<string, BadgeTone> = {
+  rascunho: 'neutral',
+  enviada: 'info',
+  aprovada: 'success',
+  rejeitada: 'danger',
+};
+
+export const CONTRACT_STATUS_TONE: Record<string, BadgeTone> = {
+  ativo: 'success',
+  renovado: 'success',
+};
+
+/**
+ * Tom do badge "vence em Nd" pela urgência real do prazo (não um único tom
+ * fixo para todo `expiringSoon`): ≤7 dias é tratado como perigo iminente,
+ * ≤30 como atenção — mesmo corte que o backend já usa para marcar
+ * `expiringSoon` (`contracts.service.ts`: `daysUntilExpiration <= 30`).
+ */
+export function expiringSoonTone(daysUntilExpiration: number): BadgeTone {
+  if (daysUntilExpiration <= 7) return 'danger';
+  return 'warning';
+}

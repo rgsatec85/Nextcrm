@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { CircleDollarSign } from 'lucide-react';
+import { Drawer } from '@/components/ui/drawer';
+import { Button } from '@/components/ui/button';
 
 const PAYMENT_METHODS = [
   { value: 'pix', label: 'Pix' },
@@ -9,6 +12,8 @@ const PAYMENT_METHODS = [
   { value: 'cartao', label: 'Cartão' },
 ];
 
+// Redesign de UI: o gatilho agora abre um Drawer em vez de expandir uma
+// caixa inline — lógica de submit/validação preservada.
 export function RegisterPaymentForm({
   invoiceId,
   remaining,
@@ -52,57 +57,64 @@ export function RegisterPaymentForm({
     }
   }
 
-  if (!open) {
-    return (
-      <button
+  return (
+    <>
+      <Button
         type="button"
+        variant="link"
+        size="sm"
+        className="text-emerald-600"
         onClick={() => setOpen(true)}
-        className="text-xs font-medium text-emerald-600 hover:underline"
       >
         Registrar pagamento
-      </button>
-    );
-  }
+      </Button>
 
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
-      <label className="text-xs font-medium text-slate-700">
-        Valor
-        <input
-          type="number"
-          min="0.01"
-          step="0.01"
-          required
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="mt-1 block w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
-        />
-      </label>
-      <label className="text-xs font-medium text-slate-700">
-        Meio
-        <select
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-          className="mt-1 block rounded-md border border-slate-300 px-2 py-1 text-sm"
-        >
-          {PAYMENT_METHODS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-      >
-        {loading ? 'Salvando…' : 'Confirmar'}
-      </button>
-      <button type="button" onClick={() => setOpen(false)} className="text-xs text-slate-500 hover:underline">
-        Cancelar
-      </button>
-      {error && <p className="w-full text-xs text-red-600">{error}</p>}
-    </form>
+      <Drawer open={open} onOpenChange={setOpen} title="Registrar pagamento">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <label className="block text-sm font-medium text-slate-700">
+            Valor
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Meio de pagamento
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <div className="flex gap-3 border-t border-slate-200 pt-4">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-emerald-600 hover:bg-emerald-700"
+              icon={<CircleDollarSign className="h-4 w-4" />}
+            >
+              {loading ? 'Salvando…' : 'Confirmar'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      </Drawer>
+    </>
   );
 }
