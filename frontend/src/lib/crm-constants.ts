@@ -23,6 +23,29 @@ export const STAGE_LABELS: Record<OpportunityStage, string> = {
   fechado_perdido: 'Fechado (perdido)',
 };
 
+// Cadastro de cliente — refinamento de UI (espelha
+// backend/src/modules/customers/dto/create-customer.dto.ts).
+export const PERSON_TYPE_LABELS: Record<string, string> = {
+  juridica: 'Jurídica',
+  fisica: 'Física',
+};
+
+export const COMPANY_SIZE_LABELS: Record<string, string> = {
+  micro: 'Microempresa',
+  pequena: 'Pequena',
+  media: 'Média',
+  grande: 'Grande',
+};
+
+export const LEAD_SOURCE_LABELS: Record<string, string> = {
+  indicacao: 'Indicação',
+  site: 'Site',
+  evento: 'Evento',
+  prospeccao_ativa: 'Prospecção ativa',
+  midia_paga: 'Mídia paga',
+  outro: 'Outro',
+};
+
 export const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   reuniao: 'Reunião',
   ligacao: 'Ligação',

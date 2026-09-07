@@ -80,6 +80,15 @@ export interface Customer {
   status: string;
   ownerId: string | null;
   createdAt: string;
+  // Refinamento de UI (0006_fase_ui_cadastro_cliente.sql).
+  tradeName: string | null;
+  stateRegistration: string | null;
+  municipalRegistration: string | null;
+  personType: string;
+  subsegment: string | null;
+  companySize: string | null;
+  leadSource: string | null;
+  isStrategicAccount: boolean;
 }
 
 export interface Contact {

@@ -17,24 +17,39 @@ import { NewContractForm } from '@/components/crm/new-contract-form';
 import { RenewContractButton } from '@/components/crm/renew-contract-button';
 import { NewPortalLoginForm } from '@/components/crm/new-portal-login-form';
 import { TogglePortalLoginButton } from '@/components/crm/toggle-portal-login-button';
-import { CreateDrawer } from '@/components/ui/create-drawer';
+import { EditCustomerForm } from '@/components/crm/edit-customer-form';
+import { CreateDrawer, EditDrawer } from '@/components/ui/create-drawer';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { AttainmentBar } from '@/components/ui/progress-bar';
 import { ScoreGauge } from '@/components/charts/score-gauge';
-import { INVOICE_STATUS_TONE, ORDER_STATUS_TONE, QUOTE_STATUS_TONE, expiringSoonTone } from '@/lib/crm-constants';
+import {
+  COMPANY_SIZE_LABELS,
+  INVOICE_STATUS_TONE,
+  LEAD_SOURCE_LABELS,
+  ORDER_STATUS_TONE,
+  PERSON_TYPE_LABELS,
+  QUOTE_STATUS_TONE,
+  expiringSoonTone,
+} from '@/lib/crm-constants';
 import {
   ArrowLeft,
   Briefcase,
+  BadgeCheck,
   CalendarClock,
   Contact2,
   FileSignature,
+  IdCard,
   KeyRound,
   Package,
   Sparkles,
   Wallet,
 } from 'lucide-react';
+
+// Perfis que podem reatribuir o dono (`ownerId`) de um cliente — vendedor
+// sempre vira dono do que cria/edita no backend (ownership.ts).
+const OWNER_REASSIGN_ROLES = ['admin', 'gestor', 'financeiro'];
 
 function formatMoney(value: string | number) {
   return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -68,16 +83,23 @@ export default async function ClienteDetailPage({
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)!.value;
 
-  const customer = await backend.customer(token, id).catch((err) => {
-    if (err instanceof BackendError && (err.status === 404 || err.status === 403)) {
-      return null;
-    }
-    throw err;
-  });
+  const [customer, me, users] = await Promise.all([
+    backend.customer(token, id).catch((err) => {
+      if (err instanceof BackendError && (err.status === 404 || err.status === 403)) {
+        return null;
+      }
+      throw err;
+    }),
+    backend.me(token) as Promise<{ role: { slug: string } }>,
+    backend.users(token).catch(() => []) as Promise<{ id: string; name: string }[]>,
+  ]);
 
   if (!customer) {
     notFound();
   }
+
+  const canReassignOwner = OWNER_REASSIGN_ROLES.includes(me.role.slug);
+  const owners = canReassignOwner ? users : undefined;
 
   // Score Financeiro (Fase 2) é uma heurística, não crítica para a tela —
   // se a chamada falhar por qualquer motivo, a página segue sem o badge em
@@ -109,16 +131,97 @@ export default async function ClienteDetailPage({
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Clientes
           </Link>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{customer.name}</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+            {customer.name}
+            {customer.tradeName && (
+              <span className="ml-2 text-base font-normal text-slate-500 dark:text-slate-400">
+                ({customer.tradeName})
+              </span>
+            )}
+          </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {customer.segment ?? 'Sem segmento'} · {customer.email ?? 'sem email'} ·{' '}
             {customer.phone ?? 'sem telefone'}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <Badge tone={customer.status === 'ativo' ? 'success' : 'neutral'}>{customer.status}</Badge>
+          <div className="flex items-center gap-2">
+            {customer.isStrategicAccount && (
+              <span title="Conta estratégica">
+                <Badge tone="accent">
+                  <BadgeCheck className="mr-1 inline h-3 w-3" /> Estratégica
+                </Badge>
+              </span>
+            )}
+            <Badge tone={customer.status === 'ativo' ? 'success' : 'neutral'}>{customer.status}</Badge>
+          </div>
+          <EditDrawer triggerLabel="Editar cadastro" title="Editar cliente" size="sm" variant="secondary">
+            <EditCustomerForm customer={customer} owners={owners} />
+          </EditDrawer>
         </div>
       </section>
+
+      <Card>
+        <CardHeader icon={<IdCard className="h-4 w-4" />} title="Dados cadastrais" />
+        <dl className="grid gap-x-6 gap-y-3 px-5 py-4 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">
+              {customer.personType === 'fisica' ? 'CPF' : 'CNPJ'}
+            </dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">{customer.document ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Tipo de Pessoa</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">
+              {PERSON_TYPE_LABELS[customer.personType] ?? customer.personType}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Inscrição Estadual</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">
+              {customer.stateRegistration ?? '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Inscrição Municipal</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">
+              {customer.municipalRegistration ?? '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Subsegmento</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">{customer.subsegment ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Porte</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">
+              {customer.companySize ? (COMPANY_SIZE_LABELS[customer.companySize] ?? customer.companySize) : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Origem do Lead</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">
+              {customer.leadSource ? (LEAD_SOURCE_LABELS[customer.leadSource] ?? customer.leadSource) : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Website</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">{customer.website ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">Data de Cadastro</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">
+              {new Date(customer.createdAt).toLocaleDateString('pt-BR')}
+            </dd>
+          </div>
+        </dl>
+        {customer.notes && (
+          <p className="border-t border-slate-100 px-5 py-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+            <span className="font-medium text-slate-700 dark:text-slate-300">Notas: </span>
+            {customer.notes}
+          </p>
+        )}
+      </Card>
 
       {(scoreIa || score) && (
         <Card>

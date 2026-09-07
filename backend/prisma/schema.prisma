@@ -143,6 +143,20 @@ model Customer {
   website   String?
   notes     String?
   status    String   @default("ativo")
+  // Fase de refinamento de UI (0006_fase_ui_cadastro_cliente.sql): campos
+  // adicionais de identificação e classificação comercial, pedidos para
+  // aproximar o cadastro de um CRM enterprise real.
+  tradeName             String?  @map("trade_name")
+  stateRegistration     String?  @map("state_registration")
+  municipalRegistration String?  @map("municipal_registration")
+  // 'juridica' | 'fisica' — decide se `document` é CNPJ ou CPF.
+  personType            String   @default("juridica") @map("person_type")
+  subsegment            String?
+  // 'micro' | 'pequena' | 'media' | 'grande' — sugestão da UI, sem CHECK no
+  // banco (ver comentário na migration).
+  companySize           String?  @map("company_size")
+  leadSource            String?  @map("lead_source")
+  isStrategicAccount    Boolean  @default(false) @map("is_strategic_account")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @map("updated_at")
   createdBy String?  @map("created_by")

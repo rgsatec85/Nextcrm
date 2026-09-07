@@ -411,3 +411,75 @@ reaproveitado fora de um drawer.
 **Verificação:** `npm run lint` (0 problemas) e `npm run build` (build de
 produção limpo, todas as rotas do dashboard listadas como `ƒ` sem erro de
 compilação/prerender) após a correção.
+
+## Edição de cliente — UI que faltava
+
+O backend já tinha `PATCH /customers/:id` (`CustomersController.update`,
+desde a Fase 1) e o proxy `/api/crm/[...path]` já repassa `PATCH`, mas nunca
+existiu um formulário de edição no frontend — só criação. A tela de Clientes
+(grid) e o Cliente 360° só tinham "Novo cliente" e "Ver 360°"; não havia
+como alterar um cadastro existente.
+
+Adicionado:
+
+- `EditDrawer` (`frontend/src/components/ui/create-drawer.tsx`) — mesmo
+  padrão do `CreateDrawer` (botão + drawer lateral + `useDrawerClose` via
+  Context), mas com ícone de lápis e variante secundária por padrão (ação
+  de edição, não a ação primária da tela).
+- `EditCustomerForm` (`frontend/src/components/crm/edit-customer-form.tsx`)
+  — formulário pré-preenchido com os dados atuais do cliente (nome,
+  documento, segmento, email, telefone, website, notas, status), enviando
+  só os campos preenchidos via `PATCH /api/crm/customers/:id`.
+- Botão "Editar cadastro" no cabeçalho do Cliente 360°
+  (`frontend/src/app/(dashboard)/dashboard/clientes/[id]/page.tsx`), ao lado
+  do badge de status.
+
+Verificado com `npm run lint` e `npm run build` (ambos limpos) depois da
+mudança.
+
+## Botão de editar na grid + cadastro de cliente expandido
+
+Dois pedidos numa mesma rodada: (1) o botão de editar só existia dentro do
+Cliente 360° — faltava na tela de lista (grid) de Clientes; (2) o cadastro
+de cliente tinha poucos campos comparado a um CRM enterprise real (só
+nome/segmento/email/telefone), pedido para ficar parecido com uma referência
+visual de "Dados Gerais (Cadastro Principal)" com seções de Identificação e
+Classificação Comercial.
+
+**Grid de Clientes:** cada linha agora tem um botão "Editar" (ícone de
+lápis, `EditDrawer` variant `ghost`) ao lado de "Ver 360°" — não precisa mais
+entrar no Cliente 360° só para corrigir um dado cadastral.
+
+**Cadastro expandido** (`database/migrations/0006_fase_ui_cadastro_cliente.sql`,
+só `ALTER TABLE` na `customers` já existente — sem tabela nova, sem policy de
+RLS nova):
+
+- Identificação: Nome Fantasia (`tradeName`), CNPJ/CPF com máscara aplicada
+  ao digitar (`lib/document-mask.ts` — puramente cosmético, o backend
+  continua guardando texto livre), Inscrição Estadual/Municipal, Tipo de
+  Pessoa (jurídica/física — decide o rótulo do campo de documento e a
+  máscara), Status, Data de Cadastro (somente leitura, só aparece editando
+  um cliente existente).
+- Classificação Comercial: Segmento (mantido como texto livre — dado
+  histórico já existente, uma taxonomia fechada quebraria valores
+  existentes), Subsegmento, Porte (micro/pequena/média/grande — sugestão da
+  UI, sem CHECK rígido no banco para não exigir migration a cada valor
+  novo), Origem do Lead, Vendedor Responsável (reaproveita `ownerId`, já
+  existente desde a Fase 1 — o seletor só aparece para quem pode reatribuir
+  dono: admin/gestor/financeiro, já que vendedor sempre vira dono do que
+  cria/edita no backend, `ownership.ts`), Conta Estratégica (sim/não).
+
+Os dois formulários (criação e edição) foram unificados em torno de um
+componente só (`components/crm/customer-form-fields.tsx`) para nunca
+divergirem — cada um só monta o payload e faz o POST/PATCH. O Cliente 360°
+ganhou um card "Dados cadastrais" mostrando os campos novos (antes só eram
+editáveis, nunca exibidos em lugar nenhum).
+
+Verificado com `npm run build`/`lint`/`jest` no backend (12 testes de
+`customers` continuam passando sem alteração — os novos campos são
+opcionais/têm default, `objectContaining` nos testes não quebra) e
+`lint`/`build` no frontend. Mesma ressalva de sempre: `prisma generate` real
+não roda neste sandbox (rede bloqueada para `binaries.prisma.sh`), então o
+`tsc` local usa o client stub (tipado como `any`) — o schema e a migration
+foram escritos e revisados à mão com atenção redobrada por isso; a
+verificação de tipo completa (client real gerado) só acontece em CI/deploy.
