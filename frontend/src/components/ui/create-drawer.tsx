@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { Drawer } from '@/components/ui/drawer';
 import { Button, type ButtonVariant, type ButtonSize } from '@/components/ui/button';
@@ -15,11 +15,28 @@ interface CreateDrawerProps {
   size?: ButtonSize;
   className?: string;
   /**
-   * Render-prop: recebe `close` para o formulário chamar ao terminar com
-   * sucesso (o formulário em si preserva sua própria lógica/validação — só
-   * passamos o callback que fecha o drawer, ver docs/fase-ui-modernizacao.md).
+   * Conteúdo do drawer — normalmente o formulário de cadastro (ex.:
+   * `<NewCustomerForm />`). Um elemento React comum, não uma função: as
+   * páginas que usam este componente são Server Components (RSC), e o
+   * Next.js/React não permite passar uma função como prop de um Server
+   * Component para um Client Component como este ("Functions cannot be
+   * passed directly to Client Components..."). Por isso o `close()` do
+   * drawer é entregue ao formulário via Context (`useDrawerClose`) em vez de
+   * como argumento de um render-prop — ver nota em
+   * docs/fase-ui-modernizacao.md.
    */
-  children: (close: () => void) => ReactNode;
+  children: ReactNode;
+}
+
+const DrawerCloseContext = createContext<() => void>(() => {});
+
+/**
+ * Formulários renderizados dentro de um `CreateDrawer` chamam isso após
+ * salvar com sucesso para fechar o drawer. Fora de um `CreateDrawer` (ex.:
+ * formulário usado inline em outra tela) o hook retorna um no-op seguro.
+ */
+export function useDrawerClose() {
+  return useContext(DrawerCloseContext);
 }
 
 /**
@@ -37,6 +54,7 @@ export function CreateDrawer({
   children,
 }: CreateDrawerProps) {
   const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
 
   return (
     <>
@@ -51,7 +69,7 @@ export function CreateDrawer({
         {triggerLabel}
       </Button>
       <Drawer open={open} onOpenChange={setOpen} title={title ?? triggerLabel} description={description}>
-        {children(() => setOpen(false))}
+        <DrawerCloseContext.Provider value={close}>{children}</DrawerCloseContext.Provider>
       </Drawer>
     </>
   );

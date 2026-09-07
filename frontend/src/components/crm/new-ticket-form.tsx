@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
 import { TICKET_PRIORITY_LABELS } from '@/lib/crm-constants';
+import { useDrawerClose } from '@/components/ui/create-drawer';
 
 interface NewTicketFormProps {
   customerId?: string;
@@ -13,6 +14,7 @@ interface NewTicketFormProps {
 
 export function NewTicketForm({ customerId, customers, onSuccess }: NewTicketFormProps) {
   const router = useRouter();
+  const closeDrawer = useDrawerClose();
   const [selectedCustomerId, setSelectedCustomerId] = useState(
     customerId ?? customers?.[0]?.id ?? '',
   );
@@ -56,6 +58,7 @@ export function NewTicketForm({ customerId, customers, onSuccess }: NewTicketFor
       setDescription('');
       setPriority('media');
       router.refresh();
+      closeDrawer();
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');

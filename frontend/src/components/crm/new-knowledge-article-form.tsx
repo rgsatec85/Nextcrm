@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
+import { useDrawerClose } from '@/components/ui/create-drawer';
 
 export function NewKnowledgeArticleForm({ onSuccess }: { onSuccess?: () => void } = {}) {
   const router = useRouter();
+  const closeDrawer = useDrawerClose();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [body, setBody] = useState('');
@@ -37,6 +39,7 @@ export function NewKnowledgeArticleForm({ onSuccess }: { onSuccess?: () => void 
       setCategory('');
       setBody('');
       router.refresh();
+      closeDrawer();
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');

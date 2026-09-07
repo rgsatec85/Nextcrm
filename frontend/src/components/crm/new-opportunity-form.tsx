@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
+import { useDrawerClose } from '@/components/ui/create-drawer';
 
 interface NewOpportunityFormProps {
   // Uso no Cliente 360°: cliente fixo, sem seletor.
@@ -14,6 +15,7 @@ interface NewOpportunityFormProps {
 
 export function NewOpportunityForm({ customerId, customers, onSuccess }: NewOpportunityFormProps) {
   const router = useRouter();
+  const closeDrawer = useDrawerClose();
   const [selectedCustomerId, setSelectedCustomerId] = useState(
     customerId ?? customers?.[0]?.id ?? '',
   );
@@ -54,6 +56,7 @@ export function NewOpportunityForm({ customerId, customers, onSuccess }: NewOppo
       setTitle('');
       setValue('');
       router.refresh();
+      closeDrawer();
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');

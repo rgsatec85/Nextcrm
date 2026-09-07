@@ -112,12 +112,7 @@ export default async function PipelinePage() {
           triggerLabel="Nova oportunidade"
           description="Vincule a um cliente já cadastrado."
         >
-          {(close) => (
-            <NewOpportunityForm
-              customers={customers.map((c) => ({ id: c.id, name: c.name }))}
-              onSuccess={close}
-            />
-          )}
+          <NewOpportunityForm customers={customers.map((c) => ({ id: c.id, name: c.name }))} />
         </CreateDrawer>
       </section>
 

@@ -31,7 +31,7 @@ export default async function BaseDeConhecimentoPage() {
         </div>
         {canAuthor && (
           <CreateDrawer triggerLabel="Novo artigo" title="Novo artigo">
-            {(close) => <NewKnowledgeArticleForm onSuccess={close} />}
+            <NewKnowledgeArticleForm />
           </CreateDrawer>
         )}
       </section>

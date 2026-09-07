@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ACTIVITY_TYPE_LABELS } from '@/lib/crm-constants';
+import { useDrawerClose } from '@/components/ui/create-drawer';
 
 export function NewActivityForm({
   customerId,
@@ -14,6 +15,7 @@ export function NewActivityForm({
   onSuccess?: () => void;
 }) {
   const router = useRouter();
+  const closeDrawer = useDrawerClose();
   const [type, setType] = useState('reuniao');
   const [notes, setNotes] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
@@ -49,6 +51,7 @@ export function NewActivityForm({
       setNotes('');
       setScheduledAt('');
       router.refresh();
+      closeDrawer();
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');

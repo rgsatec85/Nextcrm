@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
+import { useDrawerClose } from '@/components/ui/create-drawer';
 
 export function NewPortalLoginForm({
   customerId,
@@ -12,6 +13,7 @@ export function NewPortalLoginForm({
   onSuccess?: () => void;
 }) {
   const router = useRouter();
+  const closeDrawer = useDrawerClose();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,6 +39,7 @@ export function NewPortalLoginForm({
       setEmail('');
       setPassword('');
       router.refresh();
+      closeDrawer();
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');

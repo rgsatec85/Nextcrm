@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
+import { useDrawerClose } from '@/components/ui/create-drawer';
 
 interface NewContractFormProps {
   customerId?: string;
@@ -12,6 +13,7 @@ interface NewContractFormProps {
 
 export function NewContractForm({ customerId, customers, onSuccess }: NewContractFormProps) {
   const router = useRouter();
+  const closeDrawer = useDrawerClose();
   const [selectedCustomerId, setSelectedCustomerId] = useState(
     customerId ?? customers?.[0]?.id ?? '',
   );
@@ -60,6 +62,7 @@ export function NewContractForm({ customerId, customers, onSuccess }: NewContrac
       setStartDate('');
       setEndDate('');
       router.refresh();
+      closeDrawer();
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');

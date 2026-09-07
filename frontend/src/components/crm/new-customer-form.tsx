@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
+import { useDrawerClose } from '@/components/ui/create-drawer';
 
 // Formulário de criação de cliente (spec §10). Passa pelo proxy autenticado
 // em /api/crm/* em vez de chamar o backend direto — client components não
 // têm acesso ao cookie httpOnly com o JWT.
 export function NewCustomerForm({ onSuccess }: { onSuccess?: () => void } = {}) {
   const router = useRouter();
+  const closeDrawer = useDrawerClose();
   const [name, setName] = useState('');
   const [segment, setSegment] = useState('');
   const [email, setEmail] = useState('');
@@ -46,6 +48,7 @@ export function NewCustomerForm({ onSuccess }: { onSuccess?: () => void } = {}) 
       setEmail('');
       setPhone('');
       router.refresh();
+      closeDrawer();
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');

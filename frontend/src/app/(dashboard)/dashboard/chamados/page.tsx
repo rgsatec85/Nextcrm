@@ -51,12 +51,7 @@ export default async function ChamadosPage() {
           </p>
         </div>
         <CreateDrawer triggerLabel="Abrir chamado">
-          {(close) => (
-            <NewTicketForm
-              customers={customers.map((c) => ({ id: c.id, name: c.name }))}
-              onSuccess={close}
-            />
-          )}
+          <NewTicketForm customers={customers.map((c) => ({ id: c.id, name: c.name }))} />
         </CreateDrawer>
       </section>
 

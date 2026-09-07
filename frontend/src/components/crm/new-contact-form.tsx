@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormField } from '@/components/form-field';
+import { useDrawerClose } from '@/components/ui/create-drawer';
 
 export function NewContactForm({
   customerId,
@@ -12,6 +13,7 @@ export function NewContactForm({
   onSuccess?: () => void;
 }) {
   const router = useRouter();
+  const closeDrawer = useDrawerClose();
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [email, setEmail] = useState('');
@@ -49,6 +51,7 @@ export function NewContactForm({
       setEmail('');
       setPhone('');
       router.refresh();
+      closeDrawer();
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');

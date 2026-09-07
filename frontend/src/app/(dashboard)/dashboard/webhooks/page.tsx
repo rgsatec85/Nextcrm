@@ -49,7 +49,7 @@ export default async function WebhooksPage() {
           triggerLabel="Nova assinatura"
           description="Guarde o secret exibido após criar — ele não é mostrado de novo."
         >
-          {() => <NewWebhookForm />}
+          <NewWebhookForm />
         </CreateDrawer>
       </section>
 

@@ -40,12 +40,7 @@ export default async function ContratosPage() {
           </p>
         </div>
         <CreateDrawer triggerLabel="Novo contrato">
-          {(close) => (
-            <NewContractForm
-              customers={customers.map((c) => ({ id: c.id, name: c.name }))}
-              onSuccess={close}
-            />
-          )}
+          <NewContractForm customers={customers.map((c) => ({ id: c.id, name: c.name }))} />
         </CreateDrawer>
       </section>
 

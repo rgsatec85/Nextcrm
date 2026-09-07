@@ -176,7 +176,7 @@ export default async function ClienteDetailPage({
           title={`Contatos (${customer.contacts.length})`}
           action={
             <CreateDrawer triggerLabel="Novo contato" size="sm" variant="secondary">
-              {(close) => <NewContactForm customerId={customer.id} onSuccess={close} />}
+              <NewContactForm customerId={customer.id} />
             </CreateDrawer>
           }
         />
@@ -208,7 +208,7 @@ export default async function ClienteDetailPage({
           title={`Oportunidades (${customer.opportunities.length})`}
           action={
             <CreateDrawer triggerLabel="Nova oportunidade" size="sm" variant="secondary">
-              {(close) => <NewOpportunityForm customerId={customer.id} onSuccess={close} />}
+              <NewOpportunityForm customerId={customer.id} />
             </CreateDrawer>
           }
         />
@@ -335,7 +335,7 @@ export default async function ClienteDetailPage({
           title={`Contratos (${customer.contracts.length})`}
           action={
             <CreateDrawer triggerLabel="Novo contrato" size="sm" variant="secondary">
-              {(close) => <NewContractForm customerId={customer.id} onSuccess={close} />}
+              <NewContractForm customerId={customer.id} />
             </CreateDrawer>
           }
         />
@@ -373,7 +373,7 @@ export default async function ClienteDetailPage({
           title={`Agenda (${customer.activities.length})`}
           action={
             <CreateDrawer triggerLabel="Nova atividade" size="sm" variant="secondary">
-              {(close) => <NewActivityForm customerId={customer.id} onSuccess={close} />}
+              <NewActivityForm customerId={customer.id} />
             </CreateDrawer>
           }
         />
@@ -411,7 +411,7 @@ export default async function ClienteDetailPage({
             title={`Portal do Cliente — Acesso (${portalLogins.length})`}
             action={
               <CreateDrawer triggerLabel="Novo acesso" size="sm" variant="secondary">
-                {(close) => <NewPortalLoginForm customerId={customer.id} onSuccess={close} />}
+                <NewPortalLoginForm customerId={customer.id} />
               </CreateDrawer>
             }
           />

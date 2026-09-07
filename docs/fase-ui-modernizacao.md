@@ -364,3 +364,50 @@ existe no sistema.
   há como logar e navegar as páginas reais para capturar telas — mesma
   limitação de ambiente da rodada 1, não uma tentativa nova sem sucesso por
   falta de esforço.
+
+## Correção pós-deploy: erro "Functions cannot be passed directly to Client Components"
+
+Depois do deploy da rodada 2, toda página do dashboard que usa `CreateDrawer`
+(Clientes, Contratos, Chamados, Pipeline, Base de conhecimento, Webhooks e as
+cinco seções do Cliente 360°) quebrava em produção com 500 ao navegar — a
+tela inicial (`/dashboard`, sem `CreateDrawer`) carregava normalmente, mas
+qualquer rota com um botão "Novo X" estourava
+`Error: Functions cannot be passed directly to Client Components unless you
+explicitly expose it by marking it with "use server". Or maybe you meant to
+call this function rather than return it.`
+
+**Causa raiz:** `CreateDrawer` original recebia `children` como uma
+render-prop (`children: (close: () => void) => ReactNode`), e cada página —
+todas Server Components (`async function ...Page()`, usam `cookies()`
+diretamente) — passava uma função de fecho (`{(close) => <NewCustomerForm
+onSuccess={close} />}`) como esse `children`. React Server Components não
+permitem serializar uma função de um Server Component para um Client
+Component (`CreateDrawer` é `'use client'`) — só elementos React e dados
+serializáveis cruzam essa fronteira. Isso nunca aparecia no
+`next build`/`next lint` porque o erro só é lançado em runtime, na
+renderização real da rota (as páginas são dinâmicas — `ƒ`, não `○` — então
+não são exercitadas no build estático).
+
+**Correção:** `CreateDrawer` (em `frontend/src/components/ui/create-drawer.tsx`)
+passou a receber `children: ReactNode` normal e expõe o fechamento do drawer
+via um React Context (`DrawerCloseContext` + hook `useDrawerClose()`,
+exportado do mesmo arquivo). Cada formulário (`NewCustomerForm`,
+`NewContactForm`, `NewOpportunityForm`, `NewContractForm`,
+`NewActivityForm`, `NewPortalLoginForm`, `NewTicketForm`,
+`NewKnowledgeArticleForm`) chama `useDrawerClose()` internamente e invoca o
+`close()` retornado após salvar com sucesso (além de continuar chamando
+`onSuccess?.()`, mantido por compatibilidade — hoje nenhuma página mais
+passa esse prop). `NewWebhookForm` foi deixado como estava, sem fechamento
+automático (comportamento intencional: o secret só aparece uma vez, então o
+drawer deve ficar aberto até o usuário fechar manualmente). Todas as 8
+páginas foram atualizadas para passar o formulário como elemento comum, ex.:
+`<NewCustomerForm />` em vez de `{(close) => <NewCustomerForm
+onSuccess={close} />}`.
+
+Fora de um `CreateDrawer`, `useDrawerClose()` retorna um no-op seguro (valor
+default do Context), então nenhum formulário quebra se algum dia for
+reaproveitado fora de um drawer.
+
+**Verificação:** `npm run lint` (0 problemas) e `npm run build` (build de
+produção limpo, todas as rotas do dashboard listadas como `ƒ` sem erro de
+compilação/prerender) após a correção.

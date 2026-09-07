@@ -30,7 +30,7 @@ export default async function ClientesPage() {
           triggerLabel="Novo cliente"
           description="Cadastre uma nova empresa cliente. Contatos e oportunidades são adicionados depois, no Cliente 360°."
         >
-          {(close) => <NewCustomerForm onSuccess={close} />}
+          <NewCustomerForm />
         </CreateDrawer>
       </section>
 
