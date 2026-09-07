@@ -5,7 +5,14 @@
 // não são bem representados pelo Prisma Migrate).
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // O runtime de produção (Render) usa a imagem node:22-alpine (musl).
+  // Sem isso, o `prisma generate` pode falhar em detectar a versão do
+  // OpenSSL instalada na imagem e cair no target legado "linux-musl"
+  // (linkado à libssl 1.1, que o Alpine atual não tem mais), quebrando o
+  // boot com "Error loading shared library libssl.so.1.1". Fixar o target
+  // explicitamente evita depender dessa auto-detecção.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
