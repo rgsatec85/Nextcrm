@@ -1,0 +1,34 @@
+version: "3.9"
+
+# Ambiente de desenvolvimento local. Em produção, o Postgres é o Supabase
+# (com Row Level Security) e o Redis é o Upstash — ver docs/deployment.md.
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: crm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm
+      POSTGRES_DB: crm_enterprise
+    ports:
+      - "5432:5432"
+    volumes:
+      - crm_postgres_data:/var/lib/postgresql/data
+      - ../database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm_enterprise"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: crm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  crm_postgres_data:

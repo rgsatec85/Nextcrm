@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend — lint, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm_enterprise_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://app_user:app_user@localhost:5432/crm_enterprise_test?schema=public
+      DATABASE_SERVICE_URL: postgresql://app_service:app_service@localhost:5432/crm_enterprise_test?schema=public
+      JWT_SECRET: ci-only-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npm run prisma:generate
+
+      - name: Aplicar migrations (schema + RLS) no Postgres do job
+        run: |
+          for f in ../database/migrations/*.sql; do
+            PGPASSWORD=crm psql -h localhost -U crm -d crm_enterprise_test -f "$f"
+          done
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes unitários
+        run: npm run test -- --ci
+
+      - name: Build
+        run: npm run build
+
+  frontend:
+    name: Frontend — lint, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          # No build real do Vercel, isso é sobrescrito pela env var configurada
+          # no projeto. Aqui é só um placeholder para o build não falhar.
+          BACKEND_URL: http://localhost:3001/api
+
+  security:
+    name: Security scan (SAST básico)
+    runs-on: ubuntu-latest
+    # Não bloqueia o pipeline na Fase 0 — serve para visibilidade contínua.
+    # Conforme o roadmap (Fase 5 — Hardening), isso evolui para gate
+    # obrigatório com SonarQube + OWASP ZAP (DAST) contra um ambiente de
+    # staging.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy — scan do filesystem (dependências vulneráveis, segredos)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+
+      - name: npm audit (backend)
+        working-directory: backend
+        run: npm audit --audit-level=high || true
+
+      - name: npm audit (frontend)
+        working-directory: frontend
+        run: npm audit --audit-level=high || true
