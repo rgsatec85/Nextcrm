@@ -111,6 +111,30 @@ export const QUOTE_STATUS_TONE: Record<string, BadgeTone> = {
   enviada: 'info',
   aprovada: 'success',
   rejeitada: 'danger',
+  // Fase 6 (spec v3.1) — proposta cuja validUntil passou sem decisão do
+  // cliente. Não é uma rejeição explícita, então 'warning' em vez de 'danger'.
+  expirada: 'warning',
+};
+
+// Fase 6 — Propostas como entidade própria (espelha o enum de status de
+// backend/src/modules/quotes, agora incluindo 'expirada').
+export const QUOTE_STATUS_LABELS: Record<string, string> = {
+  rascunho: 'Rascunho',
+  enviada: 'Enviada',
+  aprovada: 'Aprovada',
+  rejeitada: 'Rejeitada',
+  expirada: 'Expirada',
+};
+
+// Categorias sugeridas para modelos de proposta (spec v3.1) — texto livre no
+// backend (sem CHECK), esta lista só popula o seletor da UI; um valor fora
+// dela ainda é aceito e mostrado como está.
+export const PROPOSAL_TEMPLATE_CATEGORY_LABELS: Record<string, string> = {
+  venda_servico: 'Venda de Serviço',
+  venda_produto: 'Venda de Produto',
+  locacao: 'Locação',
+  consultoria: 'Consultoria',
+  outro: 'Outro',
 };
 
 export const CONTRACT_STATUS_TONE: Record<string, BadgeTone> = {

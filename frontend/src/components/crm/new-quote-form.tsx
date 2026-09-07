@@ -14,14 +14,30 @@ interface ItemRow {
 
 const EMPTY_ROW: ItemRow = { description: '', quantity: '1', unitPrice: '0' };
 
+interface ProposalTemplateOption {
+  id: string;
+  name: string;
+}
+
 // Proposta versionada (spec §9/§11) — cada submit cria uma NOVA versão
-// (o backend calcula o número), nunca edita uma já enviada/aprovada.
-// Redesign de UI: o botão "+ Nova proposta" agora abre um Drawer em vez de
-// expandir uma caixa inline — mesma lógica de validação/envio de antes.
-export function NewQuoteForm({ opportunityId }: { opportunityId: string }) {
+// (o backend calcula o número e o `PROP-{ano}-{seq}`), nunca edita uma já
+// enviada/aprovada. Redesign de UI: o botão "+ Nova proposta" agora abre um
+// Drawer em vez de expandir uma caixa inline — mesma lógica de
+// validação/envio de antes.
+// Fase 6 (spec v3.1) — ganhou "Validade" e seleção de modelo (usado para
+// gerar o PDF com cabeçalho/rodapé/cláusulas do modelo).
+export function NewQuoteForm({
+  opportunityId,
+  templates,
+}: {
+  opportunityId: string;
+  templates?: ProposalTemplateOption[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ItemRow[]>([{ ...EMPTY_ROW }]);
+  const [validUntil, setValidUntil] = useState('');
+  const [templateId, setTemplateId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -45,6 +61,8 @@ export function NewQuoteForm({ opportunityId }: { opportunityId: string }) {
             quantity: Number(it.quantity),
             unitPrice: Number(it.unitPrice),
           })),
+          validUntil: validUntil || undefined,
+          templateId: templateId || undefined,
         }),
       });
 
@@ -57,6 +75,8 @@ export function NewQuoteForm({ opportunityId }: { opportunityId: string }) {
       }
 
       setItems([{ ...EMPTY_ROW }]);
+      setValidUntil('');
+      setTemplateId('');
       setOpen(false);
       router.refresh();
     } catch (err) {
@@ -131,6 +151,35 @@ export function NewQuoteForm({ opportunityId }: { opportunityId: string }) {
             >
               <Plus className="h-3.5 w-3.5" /> Adicionar item
             </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm font-medium text-slate-700">
+              Validade
+              <input
+                type="date"
+                value={validUntil}
+                onChange={(e) => setValidUntil(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            </label>
+            {templates && templates.length > 0 && (
+              <label className="block text-sm font-medium text-slate-700">
+                Modelo
+                <select
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+                  <option value="">Sem modelo</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

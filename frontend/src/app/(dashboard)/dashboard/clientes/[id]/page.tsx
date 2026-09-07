@@ -121,6 +121,10 @@ export default async function ClienteDetailPage({
     throw err;
   });
 
+  // Fase 6 (spec v3.1) — modelos de proposta alimentam o seletor no
+  // formulário de nova proposta; falha aqui não deve derrubar o Cliente 360°.
+  const proposalTemplates = await backend.proposalTemplates(token).catch(() => []);
+
   return (
     <div className="space-y-8">
       <section className="flex flex-wrap items-start justify-between gap-4">
@@ -342,17 +346,26 @@ export default async function ClienteDetailPage({
                     {o.quotes.map((q) => (
                       <div key={q.id} className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                          v{q.version} · R$ {formatMoney(q.totalValue)}
+                          {q.number ?? `v${q.version}`} · R$ {formatMoney(q.totalValue)}
                           <Badge tone={QUOTE_STATUS_TONE[q.status] ?? 'neutral'}>{q.status}</Badge>
+                          {q.isWinner && <Badge tone="accent">vencedora</Badge>}
+                          {q.validUntil && (
+                            <span className="text-xs text-slate-400">
+                              válida até {new Date(q.validUntil).toLocaleDateString('pt-BR')}
+                            </span>
+                          )}
                         </span>
-                        <QuoteActions quoteId={q.id} status={q.status} />
+                        <QuoteActions quoteId={q.id} status={q.status} isWinner={q.isWinner} />
                       </div>
                     ))}
                   </div>
                 )}
 
                 <div className="mt-3">
-                  <NewQuoteForm opportunityId={o.id} />
+                  <NewQuoteForm
+                    opportunityId={o.id}
+                    templates={proposalTemplates.map((t) => ({ id: t.id, name: t.name }))}
+                  />
                 </div>
               </div>
             ))}

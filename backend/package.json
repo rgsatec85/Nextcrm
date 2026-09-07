@@ -43,6 +43,7 @@
     "ioredis": "^5.4.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdfkit": "^0.15.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "uuid": "^10.0.0"
@@ -55,6 +56,7 @@
     "@types/jest": "^29.5.13",
     "@types/node": "^22.7.5",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pdfkit": "^0.13.8",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.8.1",

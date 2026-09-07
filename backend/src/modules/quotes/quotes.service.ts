@@ -6,8 +6,9 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { OpportunitiesService } from '../opportunities/opportunities.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { ProposalPdfService } from './proposal-pdf.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { assertOwnership } from '../../common/crm/ownership';
+import { assertOwnership, ownerScopeWhere } from '../../common/crm/ownership';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { QuoteItemDto } from './dto/quote-item.dto';
@@ -22,19 +23,32 @@ export class QuotesService {
     private readonly prisma: PrismaService,
     private readonly opportunitiesService: OpportunitiesService,
     private readonly webhooksService: WebhooksService,
+    private readonly proposalPdfService: ProposalPdfService,
   ) {}
 
-  // Proposta (spec §9/§11): versionamento simples — cada revisão é uma nova
-  // linha com version incremental, a anterior fica congelada como histórico.
+  // Proposta (spec §9/§11, expandida na spec v3.1/RF011): versionamento
+  // simples — cada revisão é uma nova linha com version incremental, a
+  // anterior fica congelada como histórico. `number` é o número comercial
+  // (ex.: "PROP-2026-0001"), único por tenant — calculado aqui a partir da
+  // contagem de propostas já existentes; não é perfeitamente à prova de
+  // corrida sob concorrência extrema, mas o índice único parcial em
+  // 0007_fase6_propostas.sql garante que uma colisão nunca seria salva
+  // silenciosamente (o create() falharia e o usuário tentaria de novo).
   async create(user: AuthenticatedUser, dto: CreateQuoteDto) {
     await this.opportunitiesService.assertAccessible(user, dto.opportunityId);
 
     return this.prisma.runWithTenant(user.tenantId, async (tx) => {
-      const last = await tx.quote.findFirst({
-        where: { opportunityId: dto.opportunityId },
-        orderBy: { version: 'desc' },
-        select: { version: true },
-      });
+      const [last, countForTenant] = await Promise.all([
+        tx.quote.findFirst({
+          where: { opportunityId: dto.opportunityId },
+          orderBy: { version: 'desc' },
+          select: { version: true },
+        }),
+        tx.quote.count({ where: { tenantId: user.tenantId } }),
+      ]);
+
+      const year = new Date().getFullYear();
+      const number = `PROP-${year}-${String(countForTenant + 1).padStart(4, '0')}`;
 
       return tx.quote.create({
         data: {
@@ -44,6 +58,9 @@ export class QuotesService {
           status: 'rascunho',
           totalValue: calculateTotal(dto.items),
           items: dto.items as unknown as object,
+          number,
+          validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
+          templateId: dto.templateId,
           createdBy: user.sub,
           updatedBy: user.sub,
         },
@@ -52,13 +69,28 @@ export class QuotesService {
   }
 
   async findAll(user: AuthenticatedUser, opportunityId?: string) {
+    const scope = ownerScopeWhere(user);
+
     return this.prisma.runWithTenant(user.tenantId, (tx) =>
       tx.quote.findMany({
         where: {
           tenantId: user.tenantId,
           ...(opportunityId ? { opportunityId } : {}),
+          // ABAC (ownership.ts): vendedor só vê propostas de oportunidades
+          // que são suas — `quotes` não tem ownerId próprio, então o filtro
+          // é feito pela oportunidade relacionada.
+          ...(scope.ownerId ? { opportunity: { ownerId: scope.ownerId } } : {}),
         },
-        orderBy: [{ opportunityId: 'asc' }, { version: 'desc' }],
+        include: {
+          opportunity: {
+            select: {
+              title: true,
+              customer: { select: { id: true, name: true } },
+            },
+          },
+          template: { select: { id: true, name: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }],
       }),
     );
   }
@@ -177,6 +209,79 @@ export class QuotesService {
         });
         return result;
       });
+  }
+
+  /**
+   * "Apenas uma proposta pode ser marcada como vencedora" (spec v3.1) por
+   * oportunidade — desmarca qualquer outra vencedora da mesma oportunidade
+   * na mesma transação antes de marcar esta, então nunca existe (mesmo por
+   * um instante) duas vencedoras ao mesmo tempo. O índice único parcial
+   * `idx_quotes_one_winner_per_opportunity` (0007) garante isso também no
+   * banco, como segunda camada.
+   */
+  async markWinner(user: AuthenticatedUser, id: string) {
+    const quote = await this.findAccessible(user, id);
+
+    return this.prisma.runWithTenant(user.tenantId, async (tx) => {
+      await tx.quote.updateMany({
+        where: { opportunityId: quote.opportunityId, isWinner: true },
+        data: { isWinner: false },
+      });
+
+      return tx.quote.update({
+        where: { id },
+        data: { isWinner: true, updatedBy: user.sub },
+      });
+    });
+  }
+
+  /** Gera o PDF da proposta (spec v3.1, RF011) — ver ProposalPdfService. */
+  async pdf(user: AuthenticatedUser, id: string): Promise<Buffer> {
+    const quote = await this.prisma.runWithTenant(user.tenantId, async (tx) =>
+      tx.quote.findFirst({
+        where: { id, tenantId: user.tenantId },
+        include: {
+          opportunity: {
+            select: {
+              title: true,
+              ownerId: true,
+              customer: { select: { name: true } },
+              owner: { select: { name: true } },
+            },
+          },
+          template: true,
+        },
+      }),
+    );
+
+    if (!quote) {
+      throw new NotFoundException('Proposta não encontrada');
+    }
+    assertOwnership(user, { ownerId: quote.opportunity.ownerId });
+
+    const items = quote.items as unknown as QuoteItemDto[];
+
+    return this.proposalPdfService.generate({
+      number: quote.number,
+      version: quote.version,
+      status: quote.status,
+      totalValue: Number(quote.totalValue),
+      items,
+      validUntil: quote.validUntil,
+      createdAt: quote.createdAt,
+      customerName: quote.opportunity.customer.name,
+      opportunityTitle: quote.opportunity.title,
+      ownerName: quote.opportunity.owner?.name ?? null,
+      template: quote.template
+        ? {
+            name: quote.template.name,
+            headerText: quote.template.headerText,
+            footerText: quote.template.footerText,
+            clauses: quote.template.clauses,
+            primaryColor: quote.template.primaryColor,
+          }
+        : null,
+    });
   }
 
   private assertTransition(current: string, expected: string, next: string) {

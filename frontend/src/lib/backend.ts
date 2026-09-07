@@ -110,6 +110,11 @@ export interface Quote {
   totalValue: string | number;
   items: Array<{ description: string; quantity: number; unitPrice: number }>;
   createdAt: string;
+  // Fase 6 (spec v3.1) — Propostas como entidade própria.
+  number: string | null;
+  validUntil: string | null;
+  templateId: string | null;
+  isWinner: boolean;
 }
 
 export interface OpportunityWithQuotes {
@@ -364,6 +369,29 @@ export interface AiPipelineForecast {
   narrative: string;
 }
 
+// --- Fase 6 — Propostas como entidade própria (spec v3.1, RF011) -----------
+
+export interface ProposalTemplate {
+  id: string;
+  name: string;
+  category: string | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  headerText: string | null;
+  footerText: string | null;
+  clauses: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+// Formato de retorno de GET /quotes (lista global, fora do Cliente 360°) —
+// inclui os dados aninhados que só fazem sentido fora do contexto de uma
+// oportunidade específica (nome do cliente/oportunidade, modelo usado).
+export interface QuoteWithDetails extends Quote {
+  opportunity: { title: string; customer: { id: string; name: string } };
+  template: { id: string; name: string } | null;
+}
+
 export const backend = {
   signup: (payload: SignupPayload) =>
     request<AuthResponse>('/auth/signup', {
@@ -469,4 +497,12 @@ export const backend = {
 
   aiPipelineForecast: (token: string) =>
     request<AiPipelineForecast>('/ai/predictions/pipeline', { token }),
+
+  // Fase 6 — Propostas (spec v3.1). Escritas (criar/enviar/aprovar/rejeitar/
+  // marcar vencedora/baixar PDF) acontecem client-side via o proxy
+  // `/api/crm/quotes/...`, mesmo padrão do resto do CRM.
+  quotes: (token: string) => request<QuoteWithDetails[]>('/quotes', { token }),
+
+  proposalTemplates: (token: string) =>
+    request<ProposalTemplate[]>('/proposal-templates', { token }),
 };

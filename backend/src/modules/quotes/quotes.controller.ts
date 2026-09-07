@@ -2,11 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -81,5 +83,24 @@ export class QuotesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.quotesService.reject(user, id);
+  }
+
+  @Patch(':id/mark-winner')
+  markWinner(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.quotesService.markWinner(user, id);
+  }
+
+  @Get(':id/pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Header('Content-Disposition', 'inline; filename="proposta.pdf"')
+  async pdf(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const buffer = await this.quotesService.pdf(user, id);
+    return new StreamableFile(buffer);
   }
 }

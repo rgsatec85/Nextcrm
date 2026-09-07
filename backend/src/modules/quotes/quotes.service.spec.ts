@@ -21,21 +21,27 @@ describe('QuotesService', () => {
     const webhooksService = {
       dispatch: jest.fn().mockResolvedValue(undefined),
     };
+    const proposalPdfService = {
+      generate: jest.fn().mockResolvedValue(Buffer.from('pdf')),
+    };
     return {
       service: new QuotesService(
         prisma as never,
         opportunitiesService as never,
         webhooksService as never,
+        proposalPdfService as never,
       ),
       prisma,
       webhooksService,
+      proposalPdfService,
     };
   };
 
   it('create() calcula version incremental e totalValue a partir dos itens', async () => {
     const findFirst = jest.fn().mockResolvedValue({ version: 2 });
+    const count = jest.fn().mockResolvedValue(4);
     const create = jest.fn().mockImplementation(({ data }) => data);
-    const { service } = makeService({ quote: { findFirst, create } });
+    const { service } = makeService({ quote: { findFirst, count, create } });
 
     const result = await service.create(user('vendedor'), {
       opportunityId: 'o1',
@@ -48,12 +54,14 @@ describe('QuotesService', () => {
     expect(result.version).toBe(3);
     expect(result.totalValue).toBe(250);
     expect(result.status).toBe('rascunho');
+    expect(result.number).toBe(`PROP-${new Date().getFullYear()}-0005`);
   });
 
   it('create() começa em version 1 quando não há proposta anterior', async () => {
     const findFirst = jest.fn().mockResolvedValue(null);
+    const count = jest.fn().mockResolvedValue(0);
     const create = jest.fn().mockImplementation(({ data }) => data);
-    const { service } = makeService({ quote: { findFirst, create } });
+    const { service } = makeService({ quote: { findFirst, count, create } });
 
     const result = await service.create(user('admin'), {
       opportunityId: 'o1',
@@ -61,6 +69,36 @@ describe('QuotesService', () => {
     });
 
     expect(result.version).toBe(1);
+    expect(result.number).toBe(`PROP-${new Date().getFullYear()}-0001`);
+  });
+
+  it('markWinner() desmarca outras vencedoras da mesma oportunidade antes de marcar esta', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'q2',
+      opportunityId: 'o1',
+      opportunity: { ownerId: 'user-1', customerId: 'c1' },
+    });
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const update = jest.fn().mockResolvedValue({ id: 'q2', isWinner: true });
+    const { service } = makeService({
+      quote: { findFirst, updateMany, update },
+    });
+
+    const result = await service.markWinner(user('admin'), 'q2');
+
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { opportunityId: 'o1', isWinner: true },
+        data: { isWinner: false },
+      }),
+    );
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'q2' },
+        data: expect.objectContaining({ isWinner: true }),
+      }),
+    );
+    expect(result.isWinner).toBe(true);
   });
 
   it('approve() só funciona a partir de "enviada" — rejeita rascunho direto', async () => {

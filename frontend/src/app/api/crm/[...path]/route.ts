@@ -42,6 +42,22 @@ async function forward(
   });
 
   const contentType = res.headers.get('content-type') ?? '';
+
+  // Fase 6 — download de PDF de proposta (GET /quotes/:id/pdf) responde
+  // binário, não JSON. `res.json()`/`res.text()` corromperiam o arquivo, então
+  // este caso repassa os bytes crus com os headers originais em vez de passar
+  // pelo `NextResponse.json()` usado para o resto do proxy.
+  if (contentType.includes('application/pdf')) {
+    const buffer = await res.arrayBuffer();
+    return new NextResponse(buffer, {
+      status: res.status,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': res.headers.get('content-disposition') ?? 'inline',
+      },
+    });
+  }
+
   const body = contentType.includes('application/json')
     ? await res.json()
     : await res.text();

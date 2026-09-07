@@ -14,6 +14,7 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { OpportunitiesModule } from './modules/opportunities/opportunities.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
+import { ProposalTemplatesModule } from './modules/proposal-templates/proposal-templates.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ActivitiesModule } from './modules/activities/activities.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
@@ -62,6 +63,7 @@ import { AiModule } from './modules/ai/ai.module';
     ContactsModule,
     OpportunitiesModule,
     QuotesModule,
+    ProposalTemplatesModule,
     OrdersModule,
     ActivitiesModule,
     InvoicesModule,
