@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { Drawer } from '@/components/ui/drawer';
 import { Button, type ButtonVariant, type ButtonSize } from '@/components/ui/button';
 
@@ -64,6 +64,56 @@ export function CreateDrawer({
         size={size}
         className={className}
         icon={<Plus className={size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'} />}
+        onClick={() => setOpen(true)}
+      >
+        {triggerLabel}
+      </Button>
+      <Drawer open={open} onOpenChange={setOpen} title={title ?? triggerLabel} description={description}>
+        <DrawerCloseContext.Provider value={close}>{children}</DrawerCloseContext.Provider>
+      </Drawer>
+    </>
+  );
+}
+
+interface EditDrawerProps {
+  /** Texto do botão que abre o drawer, ex.: "Editar". */
+  triggerLabel: string;
+  /** Título mostrado no cabeçalho do drawer (default: mesmo texto do trigger). */
+  title?: string;
+  description?: string;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  className?: string;
+  /** Ver o comentário equivalente em `CreateDrawerProps.children`. */
+  children: ReactNode;
+}
+
+/**
+ * Mesmo padrão do `CreateDrawer` (botão + drawer lateral + `useDrawerClose`
+ * para o formulário fechar sozinho ao salvar), mas para editar um registro
+ * já existente — ícone de lápis em vez de "+", e o botão por padrão usa o
+ * estilo secundário (não é a ação primária da tela).
+ */
+export function EditDrawer({
+  triggerLabel,
+  title,
+  description,
+  variant = 'secondary',
+  size = 'sm',
+  className,
+  children,
+}: EditDrawerProps) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant={variant}
+        size={size}
+        className={className}
+        icon={<Pencil className={size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'} />}
         onClick={() => setOpen(true)}
       >
         {triggerLabel}
