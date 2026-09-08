@@ -61,6 +61,20 @@ describe('PortalService — hard lock por customerId', () => {
     expect(where.customerId).not.toBe('customer-A');
   });
 
+  it('contracts() nunca mostra contratos em rascunho (estado interno, ainda não ativado)', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const { service } = makeService({ contract: { findMany } });
+
+    await service.contracts(portalUser('customer-A'));
+
+    const where = findMany.mock.calls[0][0].where as Record<string, unknown>;
+    expect(where).toEqual({
+      tenantId: 'tenant-1',
+      customerId: 'customer-A',
+      status: { not: 'rascunho' },
+    });
+  });
+
   it('createTicket() ignora qualquer customerId que viesse no dto — usa sempre o do token', async () => {
     const create = jest
       .fn()

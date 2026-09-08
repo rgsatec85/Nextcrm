@@ -121,7 +121,13 @@ export class PortalService {
       user.tenantId,
       async (tx) =>
         tx.contract.findMany({
-          where: { tenantId: user.tenantId, customerId },
+          // Fase 9 (RF013): 'rascunho' é um estado interno de elaboração —
+          // o cliente só deve ver o contrato depois que ele for ativado.
+          where: {
+            tenantId: user.tenantId,
+            customerId,
+            status: { not: 'rascunho' },
+          },
           orderBy: { endDate: 'asc' },
         }),
     );

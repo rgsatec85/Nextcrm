@@ -2,11 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -22,6 +24,7 @@ import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { RenewContractDto } from './dto/renew-contract.dto';
+import { ApplyContractTemplateDto } from './dto/apply-contract-template.dto';
 
 @Controller('contracts')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -70,5 +73,33 @@ export class ContractsController {
     @Body() dto: RenewContractDto,
   ) {
     return this.contractsService.renew(user, id, dto);
+  }
+
+  @Patch(':id/activate')
+  activate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.contractsService.activate(user, id);
+  }
+
+  @Patch(':id/apply-template')
+  applyTemplate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ApplyContractTemplateDto,
+  ) {
+    return this.contractsService.applyTemplate(user, id, dto);
+  }
+
+  @Get(':id/pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Header('Content-Disposition', 'inline; filename="contrato.pdf"')
+  async pdf(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const buffer = await this.contractsService.pdf(user, id);
+    return new StreamableFile(buffer);
   }
 }

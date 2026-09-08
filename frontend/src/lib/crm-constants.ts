@@ -159,8 +159,30 @@ export const PROPOSAL_TEMPLATE_CATEGORY_LABELS: Record<string, string> = {
 };
 
 export const CONTRACT_STATUS_TONE: Record<string, BadgeTone> = {
+  rascunho: 'neutral',
   ativo: 'success',
   renovado: 'success',
+  encerrado: 'danger',
+};
+
+// Fase 9 (RF013) — 'rascunho' é o estado inicial, o único em que o corpo do
+// contrato pode ser editado (ver ContractsService.update no backend).
+export const CONTRACT_STATUS_LABELS: Record<string, string> = {
+  rascunho: 'Rascunho',
+  ativo: 'Ativo',
+  encerrado: 'Encerrado',
+  renovado: 'Renovado',
+};
+
+// Categoria livre de modelo de contrato (mesmo raciocínio de
+// PROPOSAL_TEMPLATE_CATEGORY_LABELS) — só sugestões da UI, sem CHECK no
+// backend.
+export const CONTRACT_TEMPLATE_CATEGORY_LABELS: Record<string, string> = {
+  prestacao_servico: 'Prestação de Serviço',
+  fornecimento: 'Fornecimento',
+  locacao: 'Locação',
+  parceria: 'Parceria',
+  outro: 'Outro',
 };
 
 /**

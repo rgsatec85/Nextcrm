@@ -20,6 +20,7 @@ import { ActivitiesModule } from './modules/activities/activities.module';
 import { AgendaBlocksModule } from './modules/agenda-blocks/agenda-blocks.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
+import { ContractTemplatesModule } from './modules/contract-templates/contract-templates.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
@@ -70,6 +71,7 @@ import { AiModule } from './modules/ai/ai.module';
     AgendaBlocksModule,
     InvoicesModule,
     ContractsModule,
+    ContractTemplatesModule,
     FinanceModule,
     WebhooksModule,
     TicketsModule,

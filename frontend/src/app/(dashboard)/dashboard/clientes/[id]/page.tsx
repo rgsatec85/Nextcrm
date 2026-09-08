@@ -18,6 +18,7 @@ import { RegisterPaymentForm } from '@/components/crm/register-payment-form';
 import { CancelInvoiceButton } from '@/components/crm/cancel-invoice-button';
 import { NewContractForm } from '@/components/crm/new-contract-form';
 import { RenewContractButton } from '@/components/crm/renew-contract-button';
+import { ActivateContractButton } from '@/components/crm/activate-contract-button';
 import { NewPortalLoginForm } from '@/components/crm/new-portal-login-form';
 import { TogglePortalLoginButton } from '@/components/crm/toggle-portal-login-button';
 import { EditCustomerForm } from '@/components/crm/edit-customer-form';
@@ -30,6 +31,8 @@ import { ScoreGauge } from '@/components/charts/score-gauge';
 import {
   ACTIVITY_TYPE_LABELS,
   COMPANY_SIZE_LABELS,
+  CONTRACT_STATUS_LABELS,
+  CONTRACT_STATUS_TONE,
   INVOICE_STATUS_TONE,
   LEAD_SOURCE_LABELS,
   ORDER_STATUS_LABELS,
@@ -511,6 +514,11 @@ export default async function ClienteDetailPage({
                     · até {new Date(c.endDate).toLocaleDateString('pt-BR')} · R${' '}
                     {formatMoney(c.value)}
                   </span>
+                  <span className="ml-2">
+                    <Badge tone={CONTRACT_STATUS_TONE[c.status] ?? 'neutral'}>
+                      {CONTRACT_STATUS_LABELS[c.status] ?? c.status}
+                    </Badge>
+                  </span>
                   {c.expiringSoon && (
                     <span className="ml-2">
                       <Badge tone={expiringSoonTone(c.daysUntilExpiration)}>
@@ -519,7 +527,16 @@ export default async function ClienteDetailPage({
                     </span>
                   )}
                 </div>
-                {c.status === 'ativo' && <RenewContractButton contractId={c.id} />}
+                <div className="flex items-center gap-3">
+                  {c.status === 'rascunho' && <ActivateContractButton contractId={c.id} />}
+                  {c.status === 'ativo' && <RenewContractButton contractId={c.id} />}
+                  <Link
+                    href="/dashboard/contratos"
+                    className="text-xs font-medium text-brand-600 hover:underline"
+                  >
+                    Ver / editar corpo
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

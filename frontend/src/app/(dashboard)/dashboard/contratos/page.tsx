@@ -3,15 +3,17 @@ import { cookies } from 'next/headers';
 import { backend } from '@/lib/backend';
 import { SESSION_COOKIE } from '@/lib/session';
 import { NewContractForm } from '@/components/crm/new-contract-form';
+import { EditContractForm } from '@/components/crm/edit-contract-form';
 import { RenewContractButton } from '@/components/crm/renew-contract-button';
-import { CreateDrawer } from '@/components/ui/create-drawer';
+import { ActivateContractButton } from '@/components/crm/activate-contract-button';
+import { CreateDrawer, EditDrawer } from '@/components/ui/create-drawer';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { InitialsAvatar } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/ui/empty-state';
-import { CONTRACT_STATUS_TONE, expiringSoonTone } from '@/lib/crm-constants';
-import { AlarmClock, CircleCheck, FileSignature, Wallet } from 'lucide-react';
+import { CONTRACT_STATUS_LABELS, CONTRACT_STATUS_TONE, expiringSoonTone } from '@/lib/crm-constants';
+import { AlarmClock, CircleCheck, Download, FileSignature, LayoutTemplate, Wallet } from 'lucide-react';
 
 function formatMoney(value: string | number) {
   return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -21,9 +23,10 @@ export default async function ContratosPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)!.value;
 
-  const [contracts, customers] = await Promise.all([
+  const [contracts, customers, templates] = await Promise.all([
     backend.contracts(token),
     backend.customers(token),
+    backend.contractTemplates(token),
   ]);
 
   const activeContracts = contracts.filter((c) => c.status === 'ativo');
@@ -36,12 +39,24 @@ export default async function ContratosPage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Contratos</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Vigência, renovação e alertas de vencimento (spec Fase 2).
+            Vigência, renovação e alertas de vencimento (spec Fase 2), com corpo em texto rico e
+            modelos reutilizáveis (Fase 9, RF013).
           </p>
         </div>
-        <CreateDrawer triggerLabel="Novo contrato">
-          <NewContractForm customers={customers.map((c) => ({ id: c.id, name: c.name }))} />
-        </CreateDrawer>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/contratos/modelos"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <LayoutTemplate className="h-4 w-4" /> Modelos
+          </Link>
+          <CreateDrawer triggerLabel="Novo contrato">
+            <NewContractForm
+              customers={customers.map((c) => ({ id: c.id, name: c.name }))}
+              templates={templates}
+            />
+          </CreateDrawer>
+        </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
@@ -119,10 +134,26 @@ export default async function ContratosPage() {
                     </td>
                     <td className="px-5 py-2.5 text-slate-700 dark:text-slate-300">R$ {formatMoney(c.value)}</td>
                     <td className="px-5 py-2.5">
-                      <Badge tone={CONTRACT_STATUS_TONE[c.status] ?? 'neutral'}>{c.status}</Badge>
+                      <Badge tone={CONTRACT_STATUS_TONE[c.status] ?? 'neutral'}>
+                        {CONTRACT_STATUS_LABELS[c.status] ?? c.status}
+                      </Badge>
                     </td>
-                    <td className="px-5 py-2.5 text-right">
-                      {c.status === 'ativo' && <RenewContractButton contractId={c.id} />}
+                    <td className="px-5 py-2.5">
+                      <div className="flex items-center justify-end gap-3">
+                        {c.status === 'rascunho' && <ActivateContractButton contractId={c.id} />}
+                        {c.status === 'ativo' && <RenewContractButton contractId={c.id} />}
+                        <EditDrawer triggerLabel="Editar" title="Editar contrato" size="sm" variant="ghost">
+                          <EditContractForm contract={c} templates={templates} />
+                        </EditDrawer>
+                        <a
+                          href={`/api/crm/contracts/${c.id}/pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:underline dark:text-slate-300"
+                        >
+                          <Download className="h-3 w-3" /> PDF
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 ))}

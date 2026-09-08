@@ -47,6 +47,7 @@ model Company {
   webhookSubscriptions WebhookSubscription[]
   aiQueryLogs          AiQueryLog[]
   proposalTemplates    ProposalTemplate[]
+  contractTemplates    ContractTemplate[]
 
   @@map("companies")
 }
@@ -410,20 +411,51 @@ model Contract {
   startDate            DateTime  @map("start_date") @db.Date
   endDate              DateTime  @map("end_date") @db.Date
   renewalPeriodMonths  Int?      @map("renewal_period_months")
-  status               String    @default("ativo")
+  // Fase 9 (0010_fase9_contratos.sql, RF013) — 'rascunho' é o novo default;
+  // contratos antigos mantêm 'ativo' até serem migrados manualmente.
+  status               String    @default("rascunho")
   notes                String?
+  // Fase 9 — corpo do contrato em HTML já saneado (ver
+  // sanitize-contract-body.ts); só editável enquanto status === 'rascunho'.
+  body                 String?
+  templateId           String?   @map("template_id")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @default(now()) @map("updated_at")
   createdBy            String?   @map("created_by")
   updatedBy            String?   @map("updated_by")
 
-  company  Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  company  Company          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  template ContractTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([customerId])
   @@index([endDate])
+  @@index([templateId])
   @@map("contracts")
+}
+
+// Fase 9 (0010_fase9_contratos.sql, RF013) — modelos de contrato, mesmo
+// desenho de ProposalTemplate (campos dinâmicos {{cliente.nome}} etc.), mas
+// o corpo é copiado para dentro do Contract ao ser aplicado (não fica
+// "vivo" como em Quote/ProposalTemplate) — ver contracts.service.ts.
+model ContractTemplate {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  name         String
+  category     String?
+  body         String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @map("updated_at")
+  createdBy    String?  @map("created_by")
+  updatedBy    String?  @map("updated_by")
+
+  company   Company    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contracts Contract[]
+
+  @@index([tenantId])
+  @@map("contract_templates")
 }
 
 // =============================================================================

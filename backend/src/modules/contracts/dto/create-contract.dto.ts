@@ -38,4 +38,19 @@ export class CreateContractDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // Fase 9 (RF013) — corpo rich text (HTML), saneado no service antes de
+  // persistir (ver sanitize-contract-body.ts). Opcional: um contrato pode
+  // nascer sem corpo e ganhar um depois, via edição direta ou applyTemplate.
+  @IsOptional()
+  @IsString()
+  body?: string;
+
+  // Modelo de origem, aplicado só na criação — trocar o modelo de um
+  // contrato já existente passa pelo endpoint dedicado
+  // PATCH /:id/apply-template (ver UpdateContractDto, que exclui este
+  // campo), nunca por um PATCH genérico.
+  @IsOptional()
+  @IsUUID()
+  templateId?: string;
 }

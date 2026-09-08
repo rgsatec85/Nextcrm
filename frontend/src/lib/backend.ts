@@ -213,9 +213,22 @@ export interface Contract {
   endDate: string;
   renewalPeriodMonths: number | null;
   status: string;
+  // Fase 9 (RF013) — corpo rich text (HTML já saneado) e modelo de origem.
+  body: string | null;
+  templateId: string | null;
   daysUntilExpiration: number;
   expiringSoon: boolean;
   customer?: { id: string; name: string };
+}
+
+// Fase 9 (RF013) — modelo reutilizável de contrato, mesmo desenho de
+// ProposalTemplate.
+export interface ContractTemplate {
+  id: string;
+  name: string;
+  category: string | null;
+  body: string | null;
+  isActive: boolean;
 }
 
 export interface FinanceDashboard {
@@ -475,6 +488,16 @@ export const backend = {
     request<Invoice[]>('/invoices?overdueOnly=true', { token }),
 
   contracts: (token: string) => request<Contract[]>('/contracts', { token }),
+
+  contract: (token: string, id: string) =>
+    request<Contract & { customer?: { id: string; name: string } }>(
+      `/contracts/${id}`,
+      { token },
+    ),
+
+  // Fase 9 (RF013) — modelos de contrato, mesmo padrão de proposalTemplates.
+  contractTemplates: (token: string) =>
+    request<ContractTemplate[]>('/contract-templates', { token }),
 
   // Fase 3 — Atendimento interno (tickets/knowledge/webhooks). Escritas
   // acontecem client-side via os proxies autenticados em app/api/crm/ e
